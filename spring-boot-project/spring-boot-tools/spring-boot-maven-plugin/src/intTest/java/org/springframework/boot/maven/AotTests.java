@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,31 +16,35 @@
 
 package org.springframework.boot.maven;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.contentOf;
 
 /**
  * Integration tests for the Maven plugin's AOT support.
  *
  * @author Stephane Nicoll
  * @author Andy Wilkinson
+ * @author Scott Frederick
  */
 @ExtendWith(MavenBuildExtension.class)
-public class AotTests {
+class AotTests {
 
 	@TestTemplate
 	void whenAotRunsSourcesAreGenerated(MavenBuild mavenBuild) {
 		mavenBuild.project("aot").goals("package").execute((project) -> {
 			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
 			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
-					.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.java"));
+				.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.java"));
 		});
 	}
 
@@ -80,7 +84,7 @@ public class AotTests {
 		mavenBuild.project("aot-class-proxy").goals("package").execute((project) -> {
 			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
 			assertThat(collectRelativePaths(aotDirectory.resolve("classes")))
-					.contains(Path.of("org", "test", "SampleRunner$$SpringCGLIB$$0.class"));
+				.contains(Path.of("org", "test", "SampleRunner$$SpringCGLIB$$0.class"));
 		});
 	}
 
@@ -89,7 +93,7 @@ public class AotTests {
 		mavenBuild.project("aot-profile").goals("package").execute((project) -> {
 			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
 			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
-					.contains(Path.of("org", "test", "TestProfileConfiguration__BeanDefinitions.java"));
+				.contains(Path.of("org", "test", "TestProfileConfiguration__BeanDefinitions.java"));
 		});
 	}
 
@@ -98,8 +102,34 @@ public class AotTests {
 		mavenBuild.project("aot-arguments").goals("package").execute((project) -> {
 			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
 			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
-					.contains(Path.of("org", "test", "TestProfileConfiguration__BeanDefinitions.java"));
+				.contains(Path.of("org", "test", "TestProfileConfiguration__BeanDefinitions.java"));
 		});
+	}
+
+	@TestTemplate
+	void whenAotRunsWithJvmArgumentsSourcesAreGenerated(MavenBuild mavenBuild) {
+		mavenBuild.project("aot-jvm-arguments").goals("package").execute((project) -> {
+			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
+			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
+				.contains(Path.of("org", "test", "TestProfileConfiguration__BeanDefinitions.java"));
+		});
+	}
+
+	@TestTemplate
+	void whenAotRunsWithReleaseSourcesAreGenerated(MavenBuild mavenBuild) {
+		mavenBuild.project("aot-release").goals("package").execute((project) -> {
+			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
+			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
+				.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.java"));
+		});
+	}
+
+	@TestTemplate
+	void whenAotRunsWithInvalidCompilerArgumentsCompileFails(MavenBuild mavenBuild) {
+		mavenBuild.project("aot-compiler-arguments")
+			.goals("package")
+			.executeAndFail(
+					(project) -> assertThat(buildLog(project)).contains("invalid flag: --invalid-compiler-arg"));
 	}
 
 	@TestTemplate
@@ -107,7 +137,7 @@ public class AotTests {
 		mavenBuild.project("aot").goals("package").execute((project) -> {
 			Path classesDirectory = project.toPath().resolve("target/classes");
 			assertThat(collectRelativePaths(classesDirectory))
-					.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.class"));
+				.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.class"));
 		});
 	}
 
@@ -128,7 +158,7 @@ public class AotTests {
 		mavenBuild.project("aot-class-proxy").goals("package").execute((project) -> {
 			Path classesDirectory = project.toPath().resolve("target/classes/");
 			assertThat(collectRelativePaths(classesDirectory))
-					.contains(Path.of("org", "test", "SampleRunner$$SpringCGLIB$$0.class"));
+				.contains(Path.of("org", "test", "SampleRunner$$SpringCGLIB$$0.class"));
 		});
 	}
 
@@ -146,14 +176,28 @@ public class AotTests {
 		});
 	}
 
-	Stream<Path> collectRelativePaths(Path sourceDirectory) {
-		try {
-			return Files.walk(sourceDirectory).filter(Files::isRegularFile)
-					.map((path) -> path.subpath(sourceDirectory.getNameCount(), path.getNameCount()));
+	@TestTemplate
+	void whenAotWithDevelopmentOnlyExclusions(MavenBuild mavenBuild) {
+		mavenBuild.project("aot-development-only-exclusions").goals("package").execute((project) -> {
+			Path aotDirectory = project.toPath().resolve("target/spring-aot/main");
+			assertThat(collectRelativePaths(aotDirectory.resolve("sources")))
+				.contains(Path.of("org", "test", "SampleApplication__ApplicationContextInitializer.java"));
+		});
+	}
+
+	List<Path> collectRelativePaths(Path sourceDirectory) {
+		try (Stream<Path> pathStream = Files.walk(sourceDirectory)) {
+			return pathStream.filter(Files::isRegularFile)
+				.map((path) -> path.subpath(sourceDirectory.getNameCount(), path.getNameCount()))
+				.toList();
 		}
 		catch (IOException ex) {
 			throw new IllegalStateException(ex);
 		}
+	}
+
+	protected String buildLog(File project) {
+		return contentOf(new File(project, "target/build.log"));
 	}
 
 }

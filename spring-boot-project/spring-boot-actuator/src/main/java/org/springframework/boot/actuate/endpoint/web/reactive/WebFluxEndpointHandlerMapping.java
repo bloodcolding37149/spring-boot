@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.annotation.Reflective;
 import org.springframework.aot.hint.annotation.ReflectiveRuntimeHintsRegistrar;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver;
 import org.springframework.boot.actuate.endpoint.web.EndpointMapping;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
@@ -85,10 +86,11 @@ public class WebFluxEndpointHandlerMapping extends AbstractWebFluxEndpointHandle
 		@ResponseBody
 		@Reflective
 		public Map<String, Map<String, Link>> links(ServerWebExchange exchange) {
-			String requestUri = UriComponentsBuilder.fromUri(exchange.getRequest().getURI()).replaceQuery(null)
-					.toUriString();
-			return Collections.singletonMap("_links",
-					WebFluxEndpointHandlerMapping.this.linksResolver.resolveLinks(requestUri));
+			String requestUri = UriComponentsBuilder.fromUri(exchange.getRequest().getURI())
+				.replaceQuery(null)
+				.toUriString();
+			Map<String, Link> links = WebFluxEndpointHandlerMapping.this.linksResolver.resolveLinks(requestUri);
+			return OperationResponseBody.of(Collections.singletonMap("_links", links));
 		}
 
 		@Override

@@ -11,7 +11,7 @@
 	<suppress files="LogbackLoggingSystem\.java" checks="IllegalImport" />
 	<suppress files="LogbackLoggingSystemTests\.java" checks="IllegalImport" />
 	<suppress files="LogbackConfigurationAotContributionTests\.java" checks="IllegalImport" />
-	<suppress files="MeterRegistryConfigurerIntegrationTests\.java" checks="IllegalImport" />
+	<suppress files="MetricsAutoConfigurationMeterRegistryPostProcessorIntegrationTests\.java" checks="IllegalImport" message="LoggerFactory"/>
 	<suppress files="SpringApplicationTests\.java" checks="FinalClass" />
 	<suppress files=".+Configuration\.java" checks="HideUtilityClassConstructor" />
 	<suppress files=".+Application\.java" checks="HideUtilityClassConstructor" />
@@ -73,4 +73,8 @@
 	<suppress files="FailureAnalyzers\.java" checks="RedundantModifier" />
 	<suppress files="SpringBootVersion" checks="JavadocPackage" />
 	<suppress files="spring-boot-configuration-processor[\\/]src[\\/]test[\\/]java[\\/]org[\\/]springframework[\\/]boot[\\/]configurationsample[\\/]" checks="SpringDeprecatedCheck"/>
+	<suppress files="WebEndpointTest\.java" checks="SpringTestFileName" />
+	<suppress files="ConversionServiceTest\.java" checks="SpringTestFileName" />
+	<suppress files="ImportTestcontainersTests\.java" checks="InterfaceIsType" />
+	<suppress files="MyContainers\.java" checks="InterfaceIsType" />
 </suppressions>

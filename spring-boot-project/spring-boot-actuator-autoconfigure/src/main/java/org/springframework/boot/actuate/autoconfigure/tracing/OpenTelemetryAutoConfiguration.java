@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,18 @@ package org.springframework.boot.actuate.autoconfigure.tracing;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 
-import io.micrometer.tracing.SamplerFunction;
-import io.micrometer.tracing.otel.bridge.DefaultHttpClientAttributesGetter;
-import io.micrometer.tracing.otel.bridge.DefaultHttpServerAttributesExtractor;
+import io.micrometer.tracing.SpanCustomizer;
+import io.micrometer.tracing.exporter.SpanExportingPredicate;
+import io.micrometer.tracing.exporter.SpanFilter;
+import io.micrometer.tracing.exporter.SpanReporter;
+import io.micrometer.tracing.otel.bridge.CompositeSpanExporter;
 import io.micrometer.tracing.otel.bridge.EventListener;
 import io.micrometer.tracing.otel.bridge.EventPublishingContextWrapper;
 import io.micrometer.tracing.otel.bridge.OtelBaggageManager;
 import io.micrometer.tracing.otel.bridge.OtelCurrentTraceContext;
-import io.micrometer.tracing.otel.bridge.OtelHttpClientHandler;
-import io.micrometer.tracing.otel.bridge.OtelHttpServerHandler;
 import io.micrometer.tracing.otel.bridge.OtelPropagator;
+import io.micrometer.tracing.otel.bridge.OtelSpanCustomizer;
 import io.micrometer.tracing.otel.bridge.OtelTracer;
 import io.micrometer.tracing.otel.bridge.OtelTracer.EventPublisher;
 import io.micrometer.tracing.otel.bridge.Slf4JBaggageEventListener;
@@ -70,6 +70,7 @@ import org.springframework.core.env.Environment;
  * {@link EnableAutoConfiguration Auto-configuration} for OpenTelemetry.
  *
  * @author Moritz Halbritter
+ * @author Yanming Zhou
  * @since 3.0.0
  */
 @AutoConfiguration(before = MicrometerTracingAutoConfiguration.class)
@@ -92,18 +93,22 @@ public class OpenTelemetryAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	OpenTelemetry openTelemetry(SdkTracerProvider sdkTracerProvider, ContextPropagators contextPropagators) {
-		return OpenTelemetrySdk.builder().setTracerProvider(sdkTracerProvider).setPropagators(contextPropagators)
-				.build();
+		return OpenTelemetrySdk.builder()
+			.setTracerProvider(sdkTracerProvider)
+			.setPropagators(contextPropagators)
+			.build();
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
 	SdkTracerProvider otelSdkTracerProvider(Environment environment, ObjectProvider<SpanProcessor> spanProcessors,
-			Sampler sampler) {
+			Sampler sampler, ObjectProvider<SdkTracerProviderBuilderCustomizer> customizers) {
 		String applicationName = environment.getProperty("spring.application.name", DEFAULT_APPLICATION_NAME);
-		SdkTracerProviderBuilder builder = SdkTracerProvider.builder().setSampler(sampler)
-				.setResource(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, applicationName)));
+		SdkTracerProviderBuilder builder = SdkTracerProvider.builder()
+			.setSampler(sampler)
+			.setResource(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, applicationName)));
 		spanProcessors.orderedStream().forEach(builder::addSpanProcessor);
+		customizers.orderedStream().forEach((customizer) -> customizer.customize(builder));
 		return builder.build();
 	}
 
@@ -116,16 +121,19 @@ public class OpenTelemetryAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	Sampler otelSampler() {
-		return Sampler.traceIdRatioBased(this.tracingProperties.getSampling().getProbability());
+		Sampler rootSampler = Sampler.traceIdRatioBased(this.tracingProperties.getSampling().getProbability());
+		return Sampler.parentBased(rootSampler);
 	}
 
 	@Bean
-	SpanProcessor otelSpanProcessor(ObjectProvider<SpanExporter> spanExporters) {
-		return SpanProcessor.composite(spanExporters.orderedStream().map(this::buildBatchSpanProcessor).toList());
-	}
-
-	private SpanProcessor buildBatchSpanProcessor(SpanExporter exporter) {
-		return BatchSpanProcessor.builder(exporter).build();
+	SpanProcessor otelSpanProcessor(ObjectProvider<SpanExporter> spanExporters,
+			ObjectProvider<SpanExportingPredicate> spanExportingPredicates, ObjectProvider<SpanReporter> spanReporters,
+			ObjectProvider<SpanFilter> spanFilters) {
+		return BatchSpanProcessor
+			.builder(new CompositeSpanExporter(spanExporters.orderedStream().toList(),
+					spanExportingPredicates.orderedStream().toList(), spanReporters.orderedStream().toList(),
+					spanFilters.orderedStream().toList()))
+			.build();
 	}
 
 	@Bean
@@ -135,7 +143,7 @@ public class OpenTelemetryAutoConfiguration {
 	}
 
 	@Bean
-	@ConditionalOnMissingBean
+	@ConditionalOnMissingBean(io.micrometer.tracing.Tracer.class)
 	OtelTracer micrometerOtelTracer(Tracer tracer, EventPublisher eventPublisher,
 			OtelCurrentTraceContext otelCurrentTraceContext) {
 		return new OtelTracer(tracer, otelCurrentTraceContext, eventPublisher,
@@ -164,22 +172,14 @@ public class OpenTelemetryAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	OtelHttpClientHandler otelHttpClientHandler(OpenTelemetry openTelemetry) {
-		return new OtelHttpClientHandler(openTelemetry, null, null, SamplerFunction.deferDecision(),
-				new DefaultHttpClientAttributesGetter());
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
-	OtelHttpServerHandler otelHttpServerHandler(OpenTelemetry openTelemetry) {
-		return new OtelHttpServerHandler(openTelemetry, null, null, Pattern.compile(""),
-				new DefaultHttpServerAttributesExtractor());
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
 	Slf4JEventListener otelSlf4JEventListener() {
 		return new Slf4JEventListener();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(SpanCustomizer.class)
+	OtelSpanCustomizer otelSpanCustomizer() {
+		return new OtelSpanCustomizer();
 	}
 
 	@Configuration(proxyBeanMethods = false)

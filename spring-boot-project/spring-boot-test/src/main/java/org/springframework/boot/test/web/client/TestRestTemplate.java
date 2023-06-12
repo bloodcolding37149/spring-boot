@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,8 +70,9 @@ import org.springframework.web.util.UriTemplateHandler;
 /**
  * Convenient alternative of {@link RestTemplate} that is suitable for integration tests.
  * {@code TestRestTemplate} is fault-tolerant. This means that 4xx and 5xx do not result
- * in an exception being thrown and can instead be detected via the {@link ResponseEntity
- * response entity} and its {@link ResponseEntity#getStatusCode() status code}.
+ * in an exception being thrown and can instead be detected through the
+ * {@link ResponseEntity response entity} and its {@link ResponseEntity#getStatusCode()
+ * status code}.
  * <p>
  * A {@code TestRestTemplate} can optionally carry Basic authentication headers. If Apache
  * Http Client 4.3.2 or better is available (recommended) it will be used as the client,
@@ -961,15 +962,14 @@ public class TestRestTemplate {
 	}
 
 	private URI resolveUri(RequestEntity<?> entity) {
-		if (entity instanceof UriTemplateRequestEntity) {
-			UriTemplateRequestEntity<?> templatedUriEntity = (UriTemplateRequestEntity<?>) entity;
+		if (entity instanceof UriTemplateRequestEntity<?> templatedUriEntity) {
 			if (templatedUriEntity.getVars() != null) {
-				return this.restTemplate.getUriTemplateHandler().expand(templatedUriEntity.getUriTemplate(),
-						templatedUriEntity.getVars());
+				return this.restTemplate.getUriTemplateHandler()
+					.expand(templatedUriEntity.getUriTemplate(), templatedUriEntity.getVars());
 			}
 			else if (templatedUriEntity.getVarsMap() != null) {
-				return this.restTemplate.getUriTemplateHandler().expand(templatedUriEntity.getUriTemplate(),
-						templatedUriEntity.getVarsMap());
+				return this.restTemplate.getUriTemplateHandler()
+					.expand(templatedUriEntity.getUriTemplate(), templatedUriEntity.getVarsMap());
 			}
 			throw new IllegalStateException(
 					"No variables specified for URI template: " + templatedUriEntity.getUriTemplate());
@@ -1046,7 +1046,8 @@ public class TestRestTemplate {
 			}
 			if (readTimeout != null) {
 				SocketConfig socketConfig = SocketConfig.custom()
-						.setSoTimeout((int) readTimeout.toMillis(), TimeUnit.MILLISECONDS).build();
+					.setSoTimeout((int) readTimeout.toMillis(), TimeUnit.MILLISECONDS)
+					.build();
 				builder.setDefaultSocketConfig(socketConfig);
 			}
 			return builder.build();
@@ -1055,9 +1056,11 @@ public class TestRestTemplate {
 		private SSLConnectionSocketFactory createSocketFactory()
 				throws NoSuchAlgorithmException, KeyManagementException, KeyStoreException {
 			SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-					.build();
-			return SSLConnectionSocketFactoryBuilder.create().setSslContext(sslContext)
-					.setTlsVersions(TLS.V_1_3, TLS.V_1_2).build();
+				.build();
+			return SSLConnectionSocketFactoryBuilder.create()
+				.setSslContext(sslContext)
+				.setTlsVersions(TLS.V_1_3, TLS.V_1_2)
+				.build();
 		}
 
 		@Override

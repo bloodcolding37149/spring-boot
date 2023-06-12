@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		Configuration configuration = this.loggingSystem.getConfiguration();
 		assertThat(output).contains("Hello world").doesNotContain("Hidden");
-		assertThat(new File(tmpDir() + "/spring.log").exists()).isFalse();
+		assertThat(new File(tmpDir() + "/spring.log")).doesNotExist();
 		assertThat(configuration.getConfigurationSource().getFile()).isNotNull();
 	}
 
@@ -145,7 +145,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		Configuration configuration = this.loggingSystem.getConfiguration();
 		assertThat(output).contains("Hello world").doesNotContain("Hidden");
-		assertThat(new File(tmpDir() + "/spring.log").exists()).isTrue();
+		assertThat(new File(tmpDir() + "/spring.log")).exists();
 		assertThat(configuration.getConfigurationSource().getFile()).isNotNull();
 	}
 
@@ -157,9 +157,9 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		Configuration configuration = this.loggingSystem.getConfiguration();
 		assertThat(output).contains("Hello world").contains(tmpDir() + "/tmp.log");
-		assertThat(new File(tmpDir() + "/tmp.log").exists()).isFalse();
+		assertThat(new File(tmpDir() + "/tmp.log")).doesNotExist();
 		assertThat(configuration.getConfigurationSource().getFile().getAbsolutePath())
-				.contains("log4j2-nondefault.xml");
+			.contains("log4j2-nondefault.xml");
 		assertThat(configuration.getWatchManager().getIntervalSeconds()).isEqualTo(30);
 	}
 
@@ -182,7 +182,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.debug("Hello");
 		this.loggingSystem.setLogLevel("org.springframework.boot", LogLevel.DEBUG);
 		this.logger.debug("Hello");
-		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isEqualTo(1);
+		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isOne();
 	}
 
 	@Test
@@ -194,7 +194,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.debug("Hello");
 		this.loggingSystem.setLogLevel("org.springframework.boot", null);
 		this.logger.debug("Hello");
-		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isEqualTo(1);
+		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isOne();
 	}
 
 	@Test
@@ -225,8 +225,8 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	private void assertIsPresent(String loggerName, Map<String, LogLevel> loggers, LogLevel logLevel) {
-		assertThat(loggers.containsKey(loggerName)).isTrue();
-		assertThat(loggers.get(loggerName)).isEqualTo(logLevel);
+		assertThat(loggers).containsKey(loggerName);
+		assertThat(loggers).containsEntry(loggerName, logLevel);
 	}
 
 	@Test
@@ -236,7 +236,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
 	}
 
 	@Test
@@ -254,7 +254,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.loggingSystem.initialize(this.initializationContext, null, null);
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration("doesnotexist");
-		assertThat(configuration).isEqualTo(null);
+		assertThat(configuration).isNull();
 	}
 
 	@Test
@@ -314,8 +314,8 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 	void configLocationsWithConfigurationFileSystemProperty() {
 		System.setProperty(ConfigurationFactory.CONFIGURATION_FILE_PROPERTY, "custom-log4j2.properties");
 		try {
-			assertThat(this.loggingSystem.getStandardConfigLocations()).contains("log4j2-test.properties",
-					"log4j2-test.xml", "log4j2.properties", "log4j2.xml");
+			assertThat(this.loggingSystem.getStandardConfigLocations()).containsExactly("log4j2-test.properties",
+					"log4j2-test.xml", "log4j2.properties", "log4j2.xml", "custom-log4j2.properties");
 		}
 		finally {
 			System.clearProperty(ConfigurationFactory.CONFIGURATION_FILE_PROPERTY);
@@ -391,7 +391,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		this.loggingSystem.setLogLevel("com.example.test", LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration("com.example.test");
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.DEBUG, LogLevel.DEBUG));
 		this.loggingSystem.setLogLevel("com.example.test", null);
 		LoggerConfiguration updatedConfiguration = this.loggingSystem.getLoggerConfiguration("com.example.test");
 		assertThat(updatedConfiguration).isNull();
@@ -402,17 +402,18 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		LoggerContext loggerContext = (LoggerContext) LogManager.getContext(false);
 		this.loggingSystem.beforeInitialize();
 		this.loggingSystem.initialize(this.initializationContext, null, null);
-		loggerContext.getConfiguration().addLogger("com.example.test",
-				new LoggerConfig("com.example.test", org.apache.logging.log4j.Level.INFO, false));
+		loggerContext.getConfiguration()
+			.addLogger("com.example.test",
+					new LoggerConfig("com.example.test", org.apache.logging.log4j.Level.INFO, false));
 		this.loggingSystem.setLogLevel("com.example", LogLevel.WARN);
 		this.loggingSystem.setLogLevel("com.example.test", LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration("com.example.test");
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.DEBUG, LogLevel.DEBUG));
 		this.loggingSystem.setLogLevel("com.example.test", null);
 		LoggerConfiguration updatedConfiguration = this.loggingSystem.getLoggerConfiguration("com.example.test");
 		assertThat(updatedConfiguration)
-				.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.WARN, LogLevel.WARN));
+			.isEqualTo(new LoggerConfiguration("com.example.test", LogLevel.WARN, LogLevel.WARN));
 	}
 
 	@Test
@@ -421,11 +422,12 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 		java.util.logging.Logger rootLogger = java.util.logging.Logger.getLogger("");
 		// check if Log4jBridgeHandler is used
 		Handler[] handlers = rootLogger.getHandlers();
-		assertThat(handlers.length).isEqualTo(1);
+		assertThat(handlers).hasSize(1);
 		assertThat(handlers[0]).isInstanceOf(Log4jBridgeHandler.class);
 
 		this.loggingSystem.initialize(this.initializationContext, null, null);
 		java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Log4J2LoggingSystemTests.class.getName());
+		logger.info("Log to trigger level propagation");
 		assertThat(logger.getLevel()).isNull();
 		this.loggingSystem.setLogLevel(Log4J2LoggingSystemTests.class.getName(), LogLevel.DEBUG);
 		assertThat(logger.getLevel()).isEqualTo(Level.FINE);
@@ -435,7 +437,7 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 	void shutdownHookIsDisabled() {
 		assertThat(
 				PropertiesUtil.getProperties().getBooleanProperty(ShutdownCallbackRegistry.SHUTDOWN_HOOK_ENABLED, true))
-						.isFalse();
+			.isFalse();
 	}
 
 	@Test
@@ -463,11 +465,10 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 
 	@Test
 	void initializeAddsSpringEnvironmentPropertySource() {
-		PropertiesUtil properties = PropertiesUtil.getProperties();
 		this.environment.setProperty("spring", "boot");
 		this.loggingSystem.beforeInitialize();
 		this.loggingSystem.initialize(this.initializationContext, null, null);
-		properties = PropertiesUtil.getProperties();
+		PropertiesUtil properties = PropertiesUtil.getProperties();
 		assertThat(properties.getStringProperty("spring")).isEqualTo("boot");
 	}
 
@@ -475,9 +476,11 @@ class Log4J2LoggingSystemTests extends AbstractLoggingSystemTests {
 	void nonFileUrlsAreResolvedUsingLog4J2UrlConnectionFactory() {
 		this.loggingSystem.beforeInitialize();
 		assertThatIllegalStateException()
-				.isThrownBy(() -> this.loggingSystem.initialize(this.initializationContext,
-						"http://localhost:8080/shouldnotwork", null))
-				.havingCause().isInstanceOf(ProtocolException.class).withMessageContaining("http has not been enabled");
+			.isThrownBy(() -> this.loggingSystem.initialize(this.initializationContext,
+					"http://localhost:8080/shouldnotwork", null))
+			.havingCause()
+			.isInstanceOf(ProtocolException.class)
+			.withMessageContaining("http has not been enabled");
 	}
 
 	private String getRelativeClasspathLocation(String fileName) {

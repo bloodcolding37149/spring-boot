@@ -42,9 +42,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.observation.reactive.DefaultServerRequestObservationConvention;
-import org.springframework.http.observation.reactive.ServerRequestObservationConvention;
+import org.springframework.http.server.reactive.observation.DefaultServerRequestObservationConvention;
+import org.springframework.http.server.reactive.observation.ServerRequestObservationConvention;
 import org.springframework.web.filter.reactive.ServerHttpObservationFilter;
 
 /**
@@ -77,7 +78,9 @@ public class WebFluxObservationAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
+	@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 	public ServerHttpObservationFilter webfluxObservationFilter(ObservationRegistry registry,
+			ObjectProvider<ServerRequestObservationConvention> customConvention,
 			ObjectProvider<WebFluxTagsProvider> tagConfigurer,
 			ObjectProvider<WebFluxTagsContributor> contributorsProvider) {
 		String observationName = this.observationProperties.getHttp().getServer().getRequests().getName();
@@ -85,12 +88,17 @@ public class WebFluxObservationAutoConfiguration {
 		String name = (observationName != null) ? observationName : metricName;
 		WebFluxTagsProvider tagsProvider = tagConfigurer.getIfAvailable();
 		List<WebFluxTagsContributor> tagsContributors = contributorsProvider.orderedStream().toList();
-		ServerRequestObservationConvention convention = extracted(name, tagsProvider, tagsContributors);
+		ServerRequestObservationConvention convention = createConvention(customConvention.getIfAvailable(), name,
+				tagsProvider, tagsContributors);
 		return new ServerHttpObservationFilter(registry, convention);
 	}
 
-	private ServerRequestObservationConvention extracted(String name, WebFluxTagsProvider tagsProvider,
+	private static ServerRequestObservationConvention createConvention(
+			ServerRequestObservationConvention customConvention, String name, WebFluxTagsProvider tagsProvider,
 			List<WebFluxTagsContributor> tagsContributors) {
+		if (customConvention != null) {
+			return customConvention;
+		}
 		if (tagsProvider != null) {
 			return new ServerRequestObservationConventionAdapter(name, tagsProvider);
 		}

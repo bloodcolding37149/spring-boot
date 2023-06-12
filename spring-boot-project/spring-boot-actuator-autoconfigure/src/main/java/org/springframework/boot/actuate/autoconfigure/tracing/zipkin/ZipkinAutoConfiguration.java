@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,12 +31,13 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.web.client.RestTemplateAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 /**
  * {@link EnableAutoConfiguration Auto-configuration} for Zipkin.
- *
+ * <p>
  * It uses imports on {@link ZipkinConfigurations} to guarantee the correct configuration
  * ordering.
  *
@@ -48,7 +49,14 @@ import org.springframework.context.annotation.Import;
 @Import({ SenderConfiguration.class, ReporterConfiguration.class, BraveConfiguration.class,
 		OpenTelemetryConfiguration.class })
 @ConditionalOnEnabledTracing
+@EnableConfigurationProperties(ZipkinProperties.class)
 public class ZipkinAutoConfiguration {
+
+	@Bean
+	@ConditionalOnMissingBean(ZipkinConnectionDetails.class)
+	PropertiesZipkinConnectionDetails zipkinConnectionDetails(ZipkinProperties properties) {
+		return new PropertiesZipkinConnectionDetails(properties);
+	}
 
 	@Bean
 	@ConditionalOnMissingBean

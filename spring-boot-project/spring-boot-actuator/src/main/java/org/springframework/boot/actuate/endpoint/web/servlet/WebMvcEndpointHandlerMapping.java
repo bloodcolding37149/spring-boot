@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.annotation.Reflective;
 import org.springframework.aot.hint.annotation.ReflectiveRuntimeHintsRegistrar;
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver;
 import org.springframework.boot.actuate.endpoint.web.EndpointMapping;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
@@ -84,8 +85,9 @@ public class WebMvcEndpointHandlerMapping extends AbstractWebMvcEndpointHandlerM
 		@ResponseBody
 		@Reflective
 		public Map<String, Map<String, Link>> links(HttpServletRequest request, HttpServletResponse response) {
-			return Collections.singletonMap("_links",
-					WebMvcEndpointHandlerMapping.this.linksResolver.resolveLinks(request.getRequestURL().toString()));
+			Map<String, Link> links = WebMvcEndpointHandlerMapping.this.linksResolver
+				.resolveLinks(request.getRequestURL().toString());
+			return OperationResponseBody.of(Collections.singletonMap("_links", links));
 		}
 
 		@Override

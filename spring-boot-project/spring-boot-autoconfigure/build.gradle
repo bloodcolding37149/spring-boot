@@ -2,6 +2,7 @@ plugins {
 	id "java-library"
 	id "org.jetbrains.kotlin.jvm"
 	id "org.springframework.boot.auto-configuration"
+	id "org.springframework.boot.configuration-properties"
 	id "org.springframework.boot.conventions"
 	id "org.springframework.boot.deployed"
 	id "org.springframework.boot.optional-dependencies"
@@ -29,19 +30,14 @@ dependencies {
 	optional("com.oracle.database.jdbc:ojdbc8")
 	optional("com.oracle.database.jdbc:ucp")
 	optional("com.samskivert:jmustache")
-	optional("com.sun.mail:jakarta.mail")
 	optional("io.lettuce:lettuce-core")
 	optional("io.projectreactor.netty:reactor-netty-http")
 	optional("io.r2dbc:r2dbc-spi")
 	optional("io.r2dbc:r2dbc-pool")
 	optional("io.rsocket:rsocket-core")
 	optional("io.rsocket:rsocket-transport-netty")
-	optional("io.undertow:undertow-servlet-jakarta") {
-		exclude group: "org.jboss.spec.javax.annotation", module: "jboss-annotations-api_1.3_spec"
-	}
-	optional("io.undertow:undertow-websockets-jsr-jakarta") {
-		exclude group: "org.jboss.spec.javax.annotation", module: "jboss-annotations-api_1.3_spec"
-	}
+	optional("io.undertow:undertow-servlet")
+	optional("io.undertow:undertow-websockets-jsr")
 	optional("jakarta.jms:jakarta.jms-api")
 	optional("jakarta.mail:jakarta.mail-api")
 	optional("jakarta.json.bind:jakarta.json.bind-api")
@@ -52,6 +48,7 @@ dependencies {
 	optional("jakarta.ws.rs:jakarta.ws.rs-api")
 	optional("javax.cache:cache-api")
 	optional("javax.money:money-api")
+	optional("org.apache.activemq:activemq-client-jakarta")
 	optional("org.apache.activemq:artemis-jakarta-client") {
 		exclude group: "commons-logging", module: "commons-logging"
 	}
@@ -62,6 +59,7 @@ dependencies {
 		exclude group: "commons-logging", module: "commons-logging"
 	}
 	optional("org.apache.httpcomponents.client5:httpclient5")
+	optional("org.apache.httpcomponents.core5:httpcore5-reactive")
 	optional("org.apache.kafka:kafka-streams")
 	optional("org.apache.tomcat.embed:tomcat-embed-core")
 	optional("org.apache.tomcat.embed:tomcat-embed-el")
@@ -69,6 +67,7 @@ dependencies {
 	optional("org.apache.tomcat:tomcat-jdbc")
 	optional("org.apiguardian:apiguardian-api")
 	optional("org.apache.groovy:groovy-templates")
+	optional("org.eclipse.angus:angus-mail")
 	optional("com.github.ben-manes.caffeine:caffeine")
 	optional("com.github.mxab.thymeleaf.extras:thymeleaf-extras-data-attribute")
 	optional("com.sendgrid:sendgrid-java") {
@@ -184,6 +183,7 @@ dependencies {
 		exclude group: "javax.xml.bind", module: "jaxb-api"
 	}
 	optional("org.springframework.security:spring-security-messaging")
+	optional("org.springframework.security:spring-security-oauth2-authorization-server")
 	optional("org.springframework.security:spring-security-oauth2-client")
 	optional("org.springframework.security:spring-security-oauth2-jose")
 	optional("org.springframework.security:spring-security-oauth2-resource-server")
@@ -239,6 +239,8 @@ dependencies {
 	testImplementation("org.junit.jupiter:junit-jupiter")
 	testImplementation("org.mockito:mockito-core")
 	testImplementation("org.mockito:mockito-junit-jupiter")
+	testImplementation("org.postgresql:postgresql")
+	testImplementation("org.postgresql:r2dbc-postgresql")
 	testImplementation("org.skyscreamer:jsonassert")
 	testImplementation("org.springframework:spring-test")
 	testImplementation("org.springframework:spring-core-test")

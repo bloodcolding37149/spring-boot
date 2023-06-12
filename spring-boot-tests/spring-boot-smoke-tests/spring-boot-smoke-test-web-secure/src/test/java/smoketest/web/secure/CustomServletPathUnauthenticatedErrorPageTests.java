@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
+
+import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
  * Tests for error page that permits access to all with a custom servlet path.
@@ -50,8 +50,7 @@ class CustomServletPathUnauthenticatedErrorPageTests extends AbstractUnauthentic
 				requests.requestMatchers("/public/**").permitAll();
 				requests.anyRequest().authenticated();
 			});
-			http.setSharedObject(SecurityContextRepository.class, new RequestAttributeSecurityContextRepository());
-			http.httpBasic();
+			http.httpBasic(withDefaults());
 			return http.build();
 		}
 

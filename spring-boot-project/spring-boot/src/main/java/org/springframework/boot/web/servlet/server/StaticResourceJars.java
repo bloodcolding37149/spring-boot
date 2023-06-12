@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,8 @@ class StaticResourceJars {
 		}
 		else {
 			return getUrlsFrom(Stream.of(ManagementFactory.getRuntimeMXBean().getClassPath().split(File.pathSeparator))
-					.map(this::toUrl).toArray(URL[]::new));
+				.map(this::toUrl)
+				.toArray(URL[]::new));
 		}
 	}
 
@@ -131,11 +132,8 @@ class StaticResourceJars {
 	}
 
 	private boolean isResourcesJar(JarFile jar) throws IOException {
-		try {
+		try (jar) {
 			return jar.getName().endsWith(".jar") && (jar.getJarEntry("META-INF/resources") != null);
-		}
-		finally {
-			jar.close();
 		}
 	}
 

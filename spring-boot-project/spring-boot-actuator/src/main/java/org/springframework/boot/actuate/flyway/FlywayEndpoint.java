@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationState;
 
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.context.ApplicationContext;
@@ -57,7 +58,7 @@ public class FlywayEndpoint {
 		while (target != null) {
 			Map<String, FlywayDescriptor> flywayBeans = new HashMap<>();
 			target.getBeansOfType(Flyway.class)
-					.forEach((name, flyway) -> flywayBeans.put(name, new FlywayDescriptor(flyway.info().all())));
+				.forEach((name, flyway) -> flywayBeans.put(name, new FlywayDescriptor(flyway.info().all())));
 			ApplicationContext parent = target.getParent();
 			contextFlywayBeans.put(target.getId(),
 					new ContextFlywayBeansDescriptor(flywayBeans, (parent != null) ? parent.getId() : null));
@@ -69,7 +70,7 @@ public class FlywayEndpoint {
 	/**
 	 * Description of an application's {@link Flyway} beans.
 	 */
-	public static final class FlywayBeansDescriptor {
+	public static final class FlywayBeansDescriptor implements OperationResponseBody {
 
 		private final Map<String, ContextFlywayBeansDescriptor> contexts;
 

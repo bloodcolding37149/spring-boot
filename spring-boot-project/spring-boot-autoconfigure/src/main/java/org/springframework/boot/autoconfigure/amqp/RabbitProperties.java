@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.Addr
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory.CacheMode;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory.ConfirmType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.source.InvalidConfigurationPropertyValueException;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -43,6 +44,7 @@ import org.springframework.util.StringUtils;
  * @author Artsiom Yudovin
  * @author Franjo Zilic
  * @author Eddú Meléndez
+ * @author Rafael Carvalho
  * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "spring.rabbitmq")
@@ -203,6 +205,10 @@ public class RabbitProperties {
 	 */
 	public String determineAddresses() {
 		if (CollectionUtils.isEmpty(this.parsedAddresses)) {
+			if (this.host.contains(",")) {
+				throw new InvalidConfigurationPropertyValueException("spring.rabbitmq.host", this.host,
+						"Invalid character ','. Value must be a single host. For multiple hosts, use property 'spring.rabbitmq.addresses' instead.");
+			}
 			return this.host + ":" + determinePort();
 		}
 		List<String> addressStrings = new ArrayList<>();
@@ -1127,17 +1133,20 @@ public class RabbitProperties {
 		}
 
 		private String parseUsernameAndPassword(String input) {
-			if (input.contains("@")) {
-				String[] split = StringUtils.split(input, "@");
-				String creds = split[0];
-				input = split[1];
-				split = StringUtils.split(creds, ":");
-				this.username = split[0];
-				if (split.length > 0) {
-					this.password = split[1];
-				}
+			String[] splitInput = StringUtils.split(input, "@");
+			if (splitInput == null) {
+				return input;
 			}
-			return input;
+			String credentials = splitInput[0];
+			String[] splitCredentials = StringUtils.split(credentials, ":");
+			if (splitCredentials == null) {
+				this.username = credentials;
+			}
+			else {
+				this.username = splitCredentials[0];
+				this.password = splitCredentials[1];
+			}
+			return splitInput[1];
 		}
 
 		private String parseVirtualHost(String input) {

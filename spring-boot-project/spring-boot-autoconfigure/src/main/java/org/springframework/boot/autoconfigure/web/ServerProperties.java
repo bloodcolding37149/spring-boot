@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,6 +69,8 @@ import org.springframework.util.unit.DataSize;
  * @author Victor Mandujano
  * @author Chris Bono
  * @author Parviz Rozikov
+ * @author Florian Storz
+ * @author Michael Weidmann
  * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "server", ignoreUnknownFields = true)
@@ -473,6 +475,7 @@ public class ServerProperties {
 		/**
 		 * Whether to reject requests with illegal header names or values.
 		 */
+		@Deprecated(since = "2.7.12", forRemoval = true)
 		private boolean rejectIllegalHeader = true;
 
 		/**
@@ -489,6 +492,11 @@ public class ServerProperties {
 		 * Remote Ip Valve configuration.
 		 */
 		private final Remoteip remoteip = new Remoteip();
+
+		/**
+		 * Maximum size of the HTTP response header.
+		 */
+		private DataSize maxHttpResponseHeaderSize = DataSize.ofKilobytes(8);
 
 		public DataSize getMaxHttpFormPostSize() {
 			return this.maxHttpFormPostSize;
@@ -626,6 +634,7 @@ public class ServerProperties {
 			this.connectionTimeout = connectionTimeout;
 		}
 
+		@DeprecatedConfigurationProperty(reason = "The setting has been deprecated in Tomcat")
 		public boolean isRejectIllegalHeader() {
 			return this.rejectIllegalHeader;
 		}
@@ -644,6 +653,14 @@ public class ServerProperties {
 
 		public Remoteip getRemoteip() {
 			return this.remoteip;
+		}
+
+		public DataSize getMaxHttpResponseHeaderSize() {
+			return this.maxHttpResponseHeaderSize;
+		}
+
+		public void setMaxHttpResponseHeaderSize(DataSize maxHttpResponseHeaderSize) {
+			this.maxHttpResponseHeaderSize = maxHttpResponseHeaderSize;
 		}
 
 		/**
@@ -702,7 +719,7 @@ public class ServerProperties {
 			private String locale;
 
 			/**
-			 * Whether to check for log file existence so it can be recreated it if an
+			 * Whether to check for log file existence so it can be recreated if an
 			 * external process has renamed it.
 			 */
 			private boolean checkExists = false;
@@ -974,8 +991,13 @@ public class ServerProperties {
 					+ "192\\.168\\.\\d{1,3}\\.\\d{1,3}|" // 192.168/16
 					+ "169\\.254\\.\\d{1,3}\\.\\d{1,3}|" // 169.254/16
 					+ "127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|" // 127/8
+					+ "100\\.6[4-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.[7-9]{1}\\d{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.1[0-1]{1}\\d{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.12[0-7]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
 					+ "172\\.1[6-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
-					+ "172\\.2[0-9]{1}\\.\\d{1,3}\\.\\d{1,3}|172\\.3[0-1]{1}\\.\\d{1,3}\\.\\d{1,3}|" //
+					+ "172\\.2[0-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
+					+ "172\\.3[0-1]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
 					+ "0:0:0:0:0:0:0:1|::1";
 
 			/**
@@ -1096,6 +1118,11 @@ public class ServerProperties {
 		 */
 		private Duration connectionIdleTimeout;
 
+		/**
+		 * Maximum size of the HTTP response header.
+		 */
+		private DataSize maxHttpResponseHeaderSize = DataSize.ofKilobytes(8);
+
 		public Accesslog getAccesslog() {
 			return this.accesslog;
 		}
@@ -1118,6 +1145,14 @@ public class ServerProperties {
 
 		public void setConnectionIdleTimeout(Duration connectionIdleTimeout) {
 			this.connectionIdleTimeout = connectionIdleTimeout;
+		}
+
+		public DataSize getMaxHttpResponseHeaderSize() {
+			return this.maxHttpResponseHeaderSize;
+		}
+
+		public void setMaxHttpResponseHeaderSize(DataSize maxHttpResponseHeaderSize) {
+			this.maxHttpResponseHeaderSize = maxHttpResponseHeaderSize;
 		}
 
 		/**
@@ -1506,9 +1541,18 @@ public class ServerProperties {
 		 * Whether the server should decode percent encoded slash characters. Enabling
 		 * encoded slashes can have security implications due to different servers
 		 * interpreting the slash differently. Only enable this if you have a legacy
-		 * application that requires it.
+		 * application that requires it. Has no effect when server.undertow.decode-slash
+		 * is set.
 		 */
 		private boolean allowEncodedSlash = false;
+
+		/**
+		 * Whether encoded slash characters (%2F) should be decoded. Decoding can cause
+		 * security problems if a front-end proxy does not perform the same decoding. Only
+		 * enable this if you have a legacy application that requires it. When set,
+		 * server.undertow.allow-encoded-slash has no effect.
+		 */
+		private Boolean decodeSlash;
 
 		/**
 		 * Whether the URL should be decoded. When disabled, percent-encoded characters in
@@ -1603,12 +1647,23 @@ public class ServerProperties {
 			this.maxCookies = maxCookies;
 		}
 
+		@DeprecatedConfigurationProperty(replacement = "server.undertow.decode-slash")
+		@Deprecated(forRemoval = true, since = "3.0.3")
 		public boolean isAllowEncodedSlash() {
 			return this.allowEncodedSlash;
 		}
 
+		@Deprecated(forRemoval = true, since = "3.0.3")
 		public void setAllowEncodedSlash(boolean allowEncodedSlash) {
 			this.allowEncodedSlash = allowEncodedSlash;
+		}
+
+		public Boolean getDecodeSlash() {
+			return this.decodeSlash;
+		}
+
+		public void setDecodeSlash(Boolean decodeSlash) {
+			this.decodeSlash = decodeSlash;
 		}
 
 		public boolean isDecodeUrl() {
@@ -1787,12 +1842,12 @@ public class ServerProperties {
 			/**
 			 * Socket options as defined in org.xnio.Options.
 			 */
-			private Map<String, String> socket = new LinkedHashMap<>();
+			private final Map<String, String> socket = new LinkedHashMap<>();
 
 			/**
 			 * Server options as defined in io.undertow.UndertowOptions.
 			 */
-			private Map<String, String> server = new LinkedHashMap<>();
+			private final Map<String, String> server = new LinkedHashMap<>();
 
 			public Map<String, String> getServer() {
 				return this.server;

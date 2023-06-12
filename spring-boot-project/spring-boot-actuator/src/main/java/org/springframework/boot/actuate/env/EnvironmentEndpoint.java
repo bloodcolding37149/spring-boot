@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.SanitizableData;
 import org.springframework.boot.actuate.endpoint.Sanitizer;
 import org.springframework.boot.actuate.endpoint.SanitizingFunction;
@@ -143,8 +144,9 @@ public class EnvironmentEndpoint {
 	private PropertySourceDescriptor describeSource(String sourceName, EnumerablePropertySource<?> source,
 			Predicate<String> namePredicate, boolean showUnsanitized) {
 		Map<String, PropertyValueDescriptor> properties = new LinkedHashMap<>();
-		Stream.of(source.getPropertyNames()).filter(namePredicate)
-				.forEach((name) -> properties.put(name, describeValueOf(name, source, showUnsanitized)));
+		Stream.of(source.getPropertyNames())
+			.filter(namePredicate)
+			.forEach((name) -> properties.put(name, describeValueOf(name, source, showUnsanitized)));
 		return new PropertySourceDescriptor(sourceName, properties);
 	}
 
@@ -203,7 +205,7 @@ public class EnvironmentEndpoint {
 	/**
 	 * Description of an {@link Environment}.
 	 */
-	public static final class EnvironmentDescriptor {
+	public static final class EnvironmentDescriptor implements OperationResponseBody {
 
 		private final List<String> activeProfiles;
 

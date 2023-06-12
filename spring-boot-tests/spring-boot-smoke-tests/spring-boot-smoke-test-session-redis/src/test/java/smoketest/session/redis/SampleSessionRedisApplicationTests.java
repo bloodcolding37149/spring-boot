@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.testsupport.testcontainers.RedisContainer;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -37,8 +38,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -48,22 +47,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for {@link SampleSessionRedisApplication}.
  *
  * @author Angel L. Villalain
+ * @author Moritz Halbritter
+ * @author Andy Wilkinson
+ * @author Phillip Webb
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers(disabledWithoutDocker = true)
-public class SampleSessionRedisApplicationTests {
+class SampleSessionRedisApplicationTests {
 
 	@Container
+	@ServiceConnection
 	static RedisContainer redis = new RedisContainer();
 
 	@Autowired
 	private TestRestTemplate restTemplate;
-
-	@DynamicPropertySource
-	static void applicationProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.data.redis.host", redis::getHost);
-		registry.add("spring.data.redis.port", redis::getFirstMappedPort);
-	}
 
 	@Test
 	@SuppressWarnings("unchecked")
@@ -73,7 +70,7 @@ public class SampleSessionRedisApplicationTests {
 		assertThat(response).isNotNull();
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		List<Map<String, Object>> sessions = (List<Map<String, Object>>) response.getBody().get("sessions");
-		assertThat(sessions.size()).isEqualTo(1);
+		assertThat(sessions).hasSize(1);
 	}
 
 	private String performLogin() {
@@ -96,7 +93,7 @@ public class SampleSessionRedisApplicationTests {
 
 	private ResponseEntity<Map<String, Object>> getSessions() {
 		RequestEntity<Object> request = getRequestEntity(URI.create("/actuator/sessions?username=user"));
-		ParameterizedTypeReference<Map<String, Object>> stringObjectMap = new ParameterizedTypeReference<Map<String, Object>>() {
+		ParameterizedTypeReference<Map<String, Object>> stringObjectMap = new ParameterizedTypeReference<>() {
 		};
 		return this.restTemplate.exchange(request, stringObjectMap);
 	}

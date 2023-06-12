@@ -21,8 +21,7 @@ publishing.publications.withType(MavenPublication) {
 			properties {
 				delegate."java.version"('17')
 				delegate."resource.delimiter"('@')
-				delegate."maven.compiler.source"('${java.version}')
-				delegate."maven.compiler.target"('${java.version}')
+				delegate."maven.compiler.release"('${java.version}')
 				delegate."project.build.sourceEncoding"('UTF-8')
 				delegate."project.reporting.outputEncoding"('UTF-8')
 			}
@@ -232,42 +231,55 @@ publishing.publications.withType(MavenPublication) {
 				profile {
 					delegate.id("native")
 					build {
-						plugins {
-							plugin {
-								delegate.groupId('org.springframework.boot')
-								delegate.artifactId('spring-boot-maven-plugin')
-								configuration {
-									image {
-										delegate.builder("paketobuildpacks/builder:tiny");
-										env {
-											delegate.BP_NATIVE_IMAGE("true")
+						pluginManagement {
+							plugins {
+								plugin {
+									delegate.groupId('org.apache.maven.plugins')
+									delegate.artifactId('maven-jar-plugin')
+									configuration {
+										archive {
+											manifestEntries {
+												delegate.'Spring-Boot-Native-Processed'("true")
+											}
 										}
 									}
 								}
-								executions {
-									execution {
-										delegate.id('process-aot')
-										goals {
-											delegate.goal('process-aot')
+								plugin {
+									delegate.groupId('org.springframework.boot')
+									delegate.artifactId('spring-boot-maven-plugin')
+									configuration {
+										image {
+											delegate.builder("paketobuildpacks/builder:tiny");
+											env {
+												delegate.BP_NATIVE_IMAGE("true")
+											}
+										}
+									}
+									executions {
+										execution {
+											delegate.id('process-aot')
+											goals {
+												delegate.goal('process-aot')
+											}
 										}
 									}
 								}
-							}
-							plugin {
-								delegate.groupId('org.graalvm.buildtools')
-								delegate.artifactId('native-maven-plugin')
-								configuration {
-									delegate.classesDirectory('${project.build.outputDirectory}')
-									metadataRepository {
-										delegate.enabled('true')
+								plugin {
+									delegate.groupId('org.graalvm.buildtools')
+									delegate.artifactId('native-maven-plugin')
+									configuration {
+										delegate.classesDirectory('${project.build.outputDirectory}')
+										metadataRepository {
+											delegate.enabled('true')
+										}
+										delegate.requiredVersion('22.3')
 									}
-									delegate.requiredVersion('22.3')
-								}
-								executions {
-									execution {
-										delegate.id('add-reachability-metadata')
-										goals {
-											delegate.goal('add-reachability-metadata')
+									executions {
+										execution {
+											delegate.id('add-reachability-metadata')
+											goals {
+												delegate.goal('add-reachability-metadata')
+											}
 										}
 									}
 								}

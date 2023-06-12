@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,8 +68,8 @@ class SpringEnvironmentLookupTests {
 	void lookupWhenNoSpringEnvironmentThrowsException() {
 		this.loggerContext.removeObject(Log4J2LoggingSystem.ENVIRONMENT_KEY);
 		Interpolator lookup = createLookup(this.loggerContext);
-		assertThatIllegalStateException().isThrownBy(() -> assertThat(lookup.lookup("spring:test")).isEqualTo("test"))
-				.withMessage("Unable to obtain Spring Environment from LoggerContext");
+		assertThatIllegalStateException().isThrownBy(() -> lookup.lookup("spring:test"))
+			.withMessage("Unable to obtain Spring Environment from LoggerContext");
 	}
 
 	private Interpolator createLookup(LoggerContext context) {

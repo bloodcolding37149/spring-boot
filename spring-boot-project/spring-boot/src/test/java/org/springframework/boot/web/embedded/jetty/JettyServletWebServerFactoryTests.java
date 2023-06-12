@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
 import org.springframework.boot.testsupport.system.CapturedOutput;
+import org.springframework.boot.testsupport.web.servlet.Servlet5ClassPathOverrides;
 import org.springframework.boot.web.server.Compression;
 import org.springframework.boot.web.server.GracefulShutdownResult;
 import org.springframework.boot.web.server.PortInUseException;
@@ -86,6 +87,7 @@ import static org.mockito.Mockito.mock;
  * @author Andy Wilkinson
  * @author Henri Kerola
  */
+@Servlet5ClassPathOverrides
 class JettyServletWebServerFactoryTests extends AbstractServletWebServerFactoryTests {
 
 	@Override
@@ -142,7 +144,6 @@ class JettyServletWebServerFactoryTests extends AbstractServletWebServerFactoryT
 	@Override
 	@Disabled("Jetty 11 does not support User-Agent-based compression")
 	protected void noCompressionForUserAgent() {
-
 	}
 
 	@Test
@@ -329,8 +330,9 @@ class JettyServletWebServerFactoryTests extends AbstractServletWebServerFactoryT
 		response = request.get();
 		assertThat(response).isInstanceOf(HttpResponse.class);
 		assertThat(((HttpResponse) response).getCode()).isEqualTo(200);
-		assertThat(((HttpResponse) response).getFirstHeader("Connection")).isNotNull().extracting(Header::getValue)
-				.isEqualTo("close");
+		assertThat(((HttpResponse) response).getFirstHeader("Connection")).isNotNull()
+			.extracting(Header::getValue)
+			.isEqualTo("close");
 		this.webServer.stop();
 	}
 
@@ -431,7 +433,7 @@ class JettyServletWebServerFactoryTests extends AbstractServletWebServerFactoryT
 			threadPool.setMinThreads(2);
 		});
 		assertThatExceptionOfType(WebServerException.class).isThrownBy(factory.getWebServer()::start)
-				.withCauseInstanceOf(IllegalStateException.class);
+			.withCauseInstanceOf(IllegalStateException.class);
 	}
 
 	@Test

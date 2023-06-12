@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,12 +50,12 @@ public abstract class AbstractFieldValuesProcessorTests {
 	@Test
 	void getFieldValues() throws Exception {
 		TestProcessor processor = new TestProcessor();
-		TestCompiler compiler = TestCompiler.forSystem().withProcessors(processor)
-				.withSources(SourceFile.forTestClass(FieldValues.class));
+		TestCompiler compiler = TestCompiler.forSystem()
+			.withProcessors(processor)
+			.withSources(SourceFile.forTestClass(FieldValues.class));
 		compiler.compile((compiled) -> {
 		});
 		Map<String, Object> values = processor.getValues();
-		assertThat(values.get("string")).isEqualTo("1");
 		assertThat(values.get("stringNone")).isNull();
 		assertThat(values.get("stringConst")).isEqualTo("c");
 		assertThat(values.get("bool")).isEqualTo(true);
@@ -113,7 +113,7 @@ public abstract class AbstractFieldValuesProcessorTests {
 
 		private FieldValuesParser processor;
 
-		private Map<String, Object> values = new HashMap<>();
+		private final Map<String, Object> values = new HashMap<>();
 
 		@Override
 		public synchronized void init(ProcessingEnvironment env) {

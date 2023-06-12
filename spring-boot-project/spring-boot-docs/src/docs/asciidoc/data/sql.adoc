@@ -8,7 +8,7 @@ The {spring-framework}[Spring Framework] provides extensive support for working 
 [[data.sql.datasource]]
 === Configure a DataSource
 Java's `javax.sql.DataSource` interface provides a standard method of working with database connections.
-Traditionally, a 'DataSource' uses a `URL` along with some credentials to establish a database connection.
+Traditionally, a `DataSource` uses a `URL` along with some credentials to establish a database connection.
 
 TIP: See <<howto#howto.data-access.configure-custom-datasource,the "`How-to`" section>> for more advanced examples, typically to take full control over the configuration of the DataSource.
 
@@ -298,7 +298,7 @@ For more advanced queries, a `@Query` annotation is provided.
 
 Spring Boot will auto-configure Spring Data's JDBC repositories when the necessary dependencies are on the classpath.
 They can be added to your project with a single dependency on `spring-boot-starter-data-jdbc`.
-If necessary, you can take control of Spring Data JDBC's configuration by adding the `@EnableJdbcRepositories` annotation or a `JdbcConfiguration` subclass to your application.
+If necessary, you can take control of Spring Data JDBC's configuration by adding the `@EnableJdbcRepositories` annotation or an `AbstractJdbcConfiguration` subclass to your application.
 
 TIP: For complete details of Spring Data JDBC, see the {spring-data-jdbc-docs}[reference documentation].
 

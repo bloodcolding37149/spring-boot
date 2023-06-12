@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
 import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ import org.springframework.boot.logging.LoggerConfiguration;
 import org.springframework.boot.logging.LoggingInitializationContext;
 import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.logging.LoggingSystemProperties;
+import org.springframework.boot.testsupport.classpath.ClassPathOverrides;
 import org.springframework.boot.testsupport.system.CapturedOutput;
 import org.springframework.boot.testsupport.system.OutputCaptureExtension;
 import org.springframework.core.convert.ConversionService;
@@ -109,6 +111,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		ConversionService conversionService = ApplicationConversionService.getSharedInstance();
 		this.environment.setConversionService((ConfigurableConversionService) conversionService);
 		this.initializationContext = new LoggingInitializationContext(this.environment);
+		StatusPrinter.setPrintStream(System.out);
 	}
 
 	@AfterEach
@@ -119,6 +122,23 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
+	@ClassPathOverrides("org.jboss.logging:jboss-logging:3.5.0.Final")
+	void jbossLoggingRoutesThroughLog4j2ByDefault() {
+		System.getProperties().remove("org.jboss.logging.provider");
+		org.jboss.logging.Logger jbossLogger = org.jboss.logging.Logger.getLogger(getClass());
+		assertThat(jbossLogger.getClass().getName()).isEqualTo("org.jboss.logging.Log4j2Logger");
+	}
+
+	@Test
+	@ClassPathOverrides("org.jboss.logging:jboss-logging:3.5.0.Final")
+	void jbossLoggingRoutesThroughSlf4jWhenLoggingSystemIsInitialized() {
+		this.loggingSystem.beforeInitialize();
+		initialize(this.initializationContext, null, null);
+		assertThat(org.jboss.logging.Logger.getLogger(getClass()).getClass().getName())
+			.isEqualTo("org.jboss.logging.Slf4jLocationAwareLogger");
+	}
+
+	@Test
 	void noFile(CapturedOutput output) {
 		this.loggingSystem.beforeInitialize();
 		this.logger.info("Hidden");
@@ -126,7 +146,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		assertThat(output).contains("Hello world").doesNotContain("Hidden");
 		assertThat(getLineWithText(output, "Hello world")).contains("INFO");
-		assertThat(new File(tmpDir() + "/spring.log").exists()).isFalse();
+		assertThat(new File(tmpDir() + "/spring.log")).doesNotExist();
 	}
 
 	@Test
@@ -139,9 +159,9 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		assertThat(output).doesNotContain("LOGBACK:");
 		assertThat(output).contains("Hello world").doesNotContain("Hidden");
 		assertThat(getLineWithText(output, "Hello world")).contains("INFO");
-		assertThat(file.exists()).isTrue();
+		assertThat(file).exists();
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
-		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize").toString()).isEqualTo("10 MB");
+		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize")).hasToString("10 MB");
 		assertThat(getRollingPolicy().getMaxHistory()).isEqualTo(7);
 	}
 
@@ -158,9 +178,11 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(this.initializationContext, "classpath:logback-nondefault.xml",
 				getLogFile(tmpDir() + "/tmp.log", null));
 		this.logger.info("Hello world");
-		assertThat(output).doesNotContain("DEBUG").contains("Hello world").contains(tmpDir() + "/tmp.log")
-				.endsWith("BOOTBOOT");
-		assertThat(new File(tmpDir() + "/tmp.log").exists()).isFalse();
+		assertThat(output).doesNotContain("DEBUG")
+			.contains("Hello world")
+			.contains(tmpDir() + "/tmp.log")
+			.endsWith("BOOTBOOT");
+		assertThat(new File(tmpDir() + "/tmp.log")).doesNotExist();
 	}
 
 	@Test
@@ -169,8 +191,8 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		try {
 			this.loggingSystem.beforeInitialize();
 			initialize(this.initializationContext, null, null);
-			assertThat(output).contains(
-					"Ignoring 'logback.configurationFile' system property. Please use 'logging.config' instead.");
+			assertThat(output)
+				.contains("Ignoring 'logback.configurationFile' system property. Please use 'logging.config' instead.");
 		}
 		finally {
 			System.clearProperty("logback.configurationFile");
@@ -181,7 +203,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	void testNonexistentConfigLocation() {
 		this.loggingSystem.beforeInitialize();
 		assertThatIllegalStateException()
-				.isThrownBy(() -> initialize(this.initializationContext, "classpath:logback-nonexistent.xml", null));
+			.isThrownBy(() -> initialize(this.initializationContext, "classpath:logback-nonexistent.xml", null));
 	}
 
 	@Test
@@ -197,7 +219,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.debug("Hello");
 		this.loggingSystem.setLogLevel("org.springframework.boot", LogLevel.DEBUG);
 		this.logger.debug("Hello");
-		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isEqualTo(1);
+		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isOne();
 	}
 
 	@Test
@@ -209,7 +231,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.debug("Hello");
 		this.loggingSystem.setLogLevel("org.springframework.boot", null);
 		this.logger.debug("Hello");
-		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isEqualTo(1);
+		assertThat(StringUtils.countOccurrencesOf(output.toString(), "Hello")).isOne();
 	}
 
 	@Test
@@ -229,7 +251,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
 	}
 
 	@Test
@@ -248,7 +270,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		logger.setLevel(Level.ALL);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.TRACE, LogLevel.TRACE));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.TRACE, LogLevel.TRACE));
 	}
 
 	@Test
@@ -391,8 +413,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, null, logFile);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
-		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize").toString())
-				.isEqualTo(expectedFileSize);
+		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize")).hasToString(expectedFileSize);
 	}
 
 	@Test
@@ -404,7 +425,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, "classpath:logback-include-base.xml", logFile);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
-		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize").toString()).isEqualTo("100 MB");
+		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize")).hasToString("100 MB");
 	}
 
 	@Test
@@ -454,8 +475,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, null, logFile);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
-		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "totalSizeCap").toString())
-				.isEqualTo(expectedFileSize);
+		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "totalSizeCap")).hasToString(expectedFileSize);
 	}
 
 	@Test
@@ -468,7 +488,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, "classpath:logback-include-base.xml", logFile);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
-		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "totalSizeCap").toString()).isEqualTo(expectedSize);
+		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "totalSizeCap")).hasToString(expectedSize);
 	}
 
 	@Test
@@ -523,6 +543,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		ReflectionUtils.doWithFields(LogbackLoggingSystemProperties.class,
 				(field) -> expectedProperties.add((String) field.get(null)), this::isPublicStaticFinal);
 		expectedProperties.removeAll(Arrays.asList("LOG_FILE", "LOG_PATH"));
+		expectedProperties.add("org.jboss.logging.provider");
 		assertThat(properties).containsOnlyKeys(expectedProperties);
 		assertThat(properties).containsEntry("CONSOLE_LOG_CHARSET", Charset.defaultCharset().name());
 	}
@@ -555,7 +576,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, null, null);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(output, "Hello world"))
-				.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}([-+]\\d{2}:\\d{2}|Z)");
+			.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}([-+]\\d{2}:\\d{2}|Z)");
 	}
 
 	@Test
@@ -597,8 +618,9 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 			File file = new File(tmpDir(), "logback-test.log");
 			LogFile logFile = getLogFile(file.getPath(), null);
 			initialize(this.initializationContext, null, logFile);
-			assertThat(output).contains("LevelChangePropagator").contains("SizeAndTimeBasedFNATP")
-					.contains("DebugLogbackConfigurator");
+			assertThat(output).contains("LevelChangePropagator")
+				.contains("SizeAndTimeBasedFNATP")
+				.contains("DebugLogbackConfigurator");
 		}
 		finally {
 			System.clearProperty("logback.debug");
@@ -646,6 +668,14 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		assertThat(contribution).isNotNull();
 	}
 
+	@Test // gh-33610
+	void springProfileIfNestedWithinSecondPhaseElementSanityChecker(CapturedOutput output) {
+		this.loggingSystem.beforeInitialize();
+		initialize(this.initializationContext, "classpath:logback-springprofile-in-root.xml", null);
+		this.logger.info("Hello world");
+		assertThat(output).contains("<springProfile> elements cannot be nested within an");
+	}
+
 	private void initialize(LoggingInitializationContext context, String configLocation, LogFile logFile) {
 		this.loggingSystem.getSystemProperties((ConfigurableEnvironment) context.getEnvironment()).apply(logFile);
 		this.loggingSystem.initialize(context, configLocation, logFile);
@@ -674,8 +704,10 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	private String getLineWithText(CharSequence output, CharSequence outputSearch) {
-		return Arrays.stream(output.toString().split("\\r?\\n")).filter((line) -> line.contains(outputSearch))
-				.findFirst().orElse(null);
+		return Arrays.stream(output.toString().split("\\r?\\n"))
+			.filter((line) -> line.contains(outputSearch))
+			.findFirst()
+			.orElse(null);
 	}
 
 }

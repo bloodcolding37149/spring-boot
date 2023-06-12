@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  */
 class ReactiveCloudFoundrySecurityService {
 
-	private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP = new ParameterizedTypeReference<Map<String, Object>>() {
+	private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP = new ParameterizedTypeReference<>() {
 	};
 
 	private final WebClient webClient;
@@ -72,8 +72,9 @@ class ReactiveCloudFoundrySecurityService {
 	}
 
 	private Http11SslContextSpec createSslContextSpec() {
-		return Http11SslContextSpec.forClient().configure(
-				(builder) -> builder.sslProvider(SslProvider.JDK).trustManager(InsecureTrustManagerFactory.INSTANCE));
+		return Http11SslContextSpec.forClient()
+			.configure((builder) -> builder.sslProvider(SslProvider.JDK)
+				.trustManager(InsecureTrustManagerFactory.INSTANCE));
 	}
 
 	/**
@@ -85,8 +86,13 @@ class ReactiveCloudFoundrySecurityService {
 	 */
 	Mono<AccessLevel> getAccessLevel(String token, String applicationId) throws CloudFoundryAuthorizationException {
 		String uri = getPermissionsUri(applicationId);
-		return this.webClient.get().uri(uri).header("Authorization", "bearer " + token).retrieve().bodyToMono(Map.class)
-				.map(this::getAccessLevel).onErrorMap(this::mapError);
+		return this.webClient.get()
+			.uri(uri)
+			.header("Authorization", "bearer " + token)
+			.retrieve()
+			.bodyToMono(Map.class)
+			.map(this::getAccessLevel)
+			.onErrorMap(this::mapError);
 	}
 
 	private Throwable mapError(Throwable throwable) {
@@ -123,8 +129,10 @@ class ReactiveCloudFoundrySecurityService {
 
 	private Mono<? extends Map<String, String>> fetchTokenKeys(String url) {
 		RequestHeadersSpec<?> uri = this.webClient.get().uri(url + "/token_keys");
-		return uri.retrieve().bodyToMono(STRING_OBJECT_MAP).map(this::extractTokenKeys).onErrorMap(
-				((ex) -> new CloudFoundryAuthorizationException(Reason.SERVICE_UNAVAILABLE, ex.getMessage())));
+		return uri.retrieve()
+			.bodyToMono(STRING_OBJECT_MAP)
+			.map(this::extractTokenKeys)
+			.onErrorMap(((ex) -> new CloudFoundryAuthorizationException(Reason.SERVICE_UNAVAILABLE, ex.getMessage())));
 	}
 
 	private Map<String, String> extractTokenKeys(Map<String, Object> response) {
@@ -141,10 +149,14 @@ class ReactiveCloudFoundrySecurityService {
 	 * @return the UAA url Mono
 	 */
 	Mono<String> getUaaUrl() {
-		this.uaaUrl = this.webClient.get().uri(this.cloudControllerUrl + "/info").retrieve().bodyToMono(Map.class)
-				.map((response) -> (String) response.get("token_endpoint")).cache()
-				.onErrorMap((ex) -> new CloudFoundryAuthorizationException(Reason.SERVICE_UNAVAILABLE,
-						"Unable to fetch token keys from UAA."));
+		this.uaaUrl = this.webClient.get()
+			.uri(this.cloudControllerUrl + "/info")
+			.retrieve()
+			.bodyToMono(Map.class)
+			.map((response) -> (String) response.get("token_endpoint"))
+			.cache()
+			.onErrorMap((ex) -> new CloudFoundryAuthorizationException(Reason.SERVICE_UNAVAILABLE,
+					"Unable to fetch token keys from UAA."));
 		return this.uaaUrl;
 	}
 

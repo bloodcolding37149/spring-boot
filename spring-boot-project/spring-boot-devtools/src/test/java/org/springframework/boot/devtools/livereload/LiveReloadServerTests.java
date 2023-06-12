@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,8 +113,8 @@ class LiveReloadServerTests {
 	void triggerReload() throws Exception {
 		LiveReloadWebSocketHandler handler = connect();
 		this.server.triggerReload();
-		List<String> messages = await().atMost(Duration.ofSeconds(10)).until(handler::getMessages,
-				(msgs) -> msgs.size() == 2);
+		List<String> messages = await().atMost(Duration.ofSeconds(10))
+			.until(handler::getMessages, (msgs) -> msgs.size() == 2);
 		assertThat(messages.get(0)).contains("http://livereload.com/protocols/official-7");
 		assertThat(messages.get(1)).contains("command\":\"reload\"");
 	}
@@ -123,8 +123,8 @@ class LiveReloadServerTests {
 	void triggerReloadWithUppercaseHeaders() throws Exception {
 		LiveReloadWebSocketHandler handler = connect(UppercaseWebSocketClient::new);
 		this.server.triggerReload();
-		List<String> messages = await().atMost(Duration.ofSeconds(10)).until(handler::getMessages,
-				(msgs) -> msgs.size() == 2);
+		List<String> messages = await().atMost(Duration.ofSeconds(10))
+			.until(handler::getMessages, (msgs) -> msgs.size() == 2);
 		assertThat(messages.get(0)).contains("http://livereload.com/protocols/official-7");
 		assertThat(messages.get(1)).contains("command\":\"reload\"");
 	}
@@ -141,7 +141,7 @@ class LiveReloadServerTests {
 		LiveReloadWebSocketHandler handler = connect();
 		handler.close();
 		awaitClosedException();
-		assertThat(this.server.getClosedExceptions().size()).isGreaterThan(0);
+		assertThat(this.server.getClosedExceptions()).isNotEmpty();
 	}
 
 	private void awaitClosedException() {
@@ -152,8 +152,8 @@ class LiveReloadServerTests {
 	void serverClose() throws Exception {
 		LiveReloadWebSocketHandler handler = connect();
 		this.server.stop();
-		CloseStatus closeStatus = await().atMost(Duration.ofSeconds(10)).until(handler::getCloseStatus,
-				Objects::nonNull);
+		CloseStatus closeStatus = await().atMost(Duration.ofSeconds(10))
+			.until(handler::getCloseStatus, Objects::nonNull);
 		assertThat(closeStatus.getCode()).isEqualTo(1006);
 	}
 
@@ -303,8 +303,10 @@ class LiveReloadServerTests {
 					remoteAddress);
 			Stream<Extension> adaptedExtensions = extensions.stream().map(WebSocketToStandardExtensionAdapter::new);
 			ClientEndpointConfig endpointConfig = ClientEndpointConfig.Builder.create()
-					.configurator(new UppercaseWebSocketClientConfigurator(headers)).preferredSubprotocols(protocols)
-					.extensions(adaptedExtensions.toList()).build();
+				.configurator(new UppercaseWebSocketClientConfigurator(headers))
+				.preferredSubprotocols(protocols)
+				.extensions(adaptedExtensions.toList())
+				.build();
 			endpointConfig.getUserProperties().putAll(getUserProperties());
 			Endpoint endpoint = new StandardWebSocketHandlerAdapter(webSocketHandler, session);
 			Callable<WebSocketSession> connectTask = () -> {

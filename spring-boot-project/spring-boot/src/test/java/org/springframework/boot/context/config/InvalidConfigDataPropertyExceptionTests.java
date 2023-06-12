@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,31 +37,32 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
  */
 class InvalidConfigDataPropertyExceptionTests {
 
-	private ConfigDataResource resource = new TestConfigDataResource();
+	private final ConfigDataResource resource = new TestConfigDataResource();
 
-	private ConfigurationPropertyName replacement = ConfigurationPropertyName.of("replacement");
+	private final ConfigurationPropertyName replacement = ConfigurationPropertyName.of("replacement");
 
-	private ConfigurationPropertyName invalid = ConfigurationPropertyName.of("invalid");
+	private final ConfigurationPropertyName invalid = ConfigurationPropertyName.of("invalid");
 
-	private ConfigurationProperty property = new ConfigurationProperty(this.invalid, "bad", MockOrigin.of("origin"));
+	private final ConfigurationProperty property = new ConfigurationProperty(this.invalid, "bad",
+			MockOrigin.of("origin"));
 
 	@Test
 	void createHasCorrectMessage() {
 		assertThat(new InvalidConfigDataPropertyException(this.property, false, this.replacement, this.resource))
-				.hasMessage(
-						"Property 'invalid' imported from location 'test' is invalid and should be replaced with 'replacement' [origin: origin]");
+			.hasMessage(
+					"Property 'invalid' imported from location 'test' is invalid and should be replaced with 'replacement' [origin: origin]");
 	}
 
 	@Test
 	void createWhenNoLocationHasCorrectMessage() {
 		assertThat(new InvalidConfigDataPropertyException(this.property, false, this.replacement, null))
-				.hasMessage("Property 'invalid' is invalid and should be replaced with 'replacement' [origin: origin]");
+			.hasMessage("Property 'invalid' is invalid and should be replaced with 'replacement' [origin: origin]");
 	}
 
 	@Test
 	void createWhenNoReplacementHasCorrectMessage() {
 		assertThat(new InvalidConfigDataPropertyException(this.property, false, null, this.resource))
-				.hasMessage("Property 'invalid' imported from location 'test' is invalid [origin: origin]");
+			.hasMessage("Property 'invalid' imported from location 'test' is invalid [origin: origin]");
 	}
 
 	@Test
@@ -74,8 +75,8 @@ class InvalidConfigDataPropertyExceptionTests {
 	@Test
 	void createWhenProfileSpecificHasCorrectMessage() {
 		ConfigurationProperty property = new ConfigurationProperty(this.invalid, "bad", null);
-		assertThat(new InvalidConfigDataPropertyException(property, true, null, this.resource)).hasMessage(
-				"Property 'invalid' imported from location 'test' is invalid in a profile specific resource");
+		assertThat(new InvalidConfigDataPropertyException(property, true, null, this.resource))
+			.hasMessage("Property 'invalid' imported from location 'test' is invalid in a profile specific resource");
 	}
 
 	@Test
@@ -105,9 +106,9 @@ class InvalidConfigDataPropertyExceptionTests {
 		propertySource.setProperty("spring.profiles", "a");
 		ConfigDataEnvironmentContributor contributor = ConfigDataEnvironmentContributor.ofExisting(propertySource);
 		assertThatExceptionOfType(InvalidConfigDataPropertyException.class)
-				.isThrownBy(() -> InvalidConfigDataPropertyException.throwIfPropertyFound(contributor))
-				.withMessageStartingWith("Property 'spring.profiles' is invalid and should be replaced with "
-						+ "'spring.config.activate.on-profile'");
+			.isThrownBy(() -> InvalidConfigDataPropertyException.throwIfPropertyFound(contributor))
+			.withMessageStartingWith("Property 'spring.profiles' is invalid and should be replaced with "
+					+ "'spring.config.activate.on-profile'");
 	}
 
 	@Test
@@ -127,8 +128,8 @@ class InvalidConfigDataPropertyExceptionTests {
 	private void throwOrWarnWhenWhenHasInvalidProfileSpecificPropertyThrowsException(String name) {
 		ConfigDataEnvironmentContributor contributor = createInvalidProfileSpecificPropertyContributor(name);
 		assertThatExceptionOfType(InvalidConfigDataPropertyException.class)
-				.isThrownBy(() -> InvalidConfigDataPropertyException.throwIfPropertyFound(contributor))
-				.withMessageStartingWith("Property '" + name + "' is invalid in a profile specific resource");
+			.isThrownBy(() -> InvalidConfigDataPropertyException.throwIfPropertyFound(contributor))
+			.withMessageStartingWith("Property '" + name + "' is invalid in a profile specific resource");
 	}
 
 	private ConfigDataEnvironmentContributor createInvalidProfileSpecificPropertyContributor(String name,
@@ -144,7 +145,7 @@ class InvalidConfigDataPropertyExceptionTests {
 	@Test
 	void throwOrWarnWhenHasNoInvalidPropertyDoesNothing() {
 		ConfigDataEnvironmentContributor contributor = ConfigDataEnvironmentContributor
-				.ofExisting(new MockPropertySource());
+			.ofExisting(new MockPropertySource());
 		InvalidConfigDataPropertyException.throwIfPropertyFound(contributor);
 	}
 

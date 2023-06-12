@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.boot.actuate.scheduling.ScheduledTasksEndpoint.ScheduledTasksEndpointRuntimeHints;
@@ -66,16 +67,18 @@ public class ScheduledTasksEndpoint {
 	@ReadOperation
 	public ScheduledTasksDescriptor scheduledTasks() {
 		Map<TaskType, List<TaskDescriptor>> descriptionsByType = this.scheduledTaskHolders.stream()
-				.flatMap((holder) -> holder.getScheduledTasks().stream()).map(ScheduledTask::getTask)
-				.map(TaskDescriptor::of).filter(Objects::nonNull)
-				.collect(Collectors.groupingBy(TaskDescriptor::getType));
+			.flatMap((holder) -> holder.getScheduledTasks().stream())
+			.map(ScheduledTask::getTask)
+			.map(TaskDescriptor::of)
+			.filter(Objects::nonNull)
+			.collect(Collectors.groupingBy(TaskDescriptor::getType));
 		return new ScheduledTasksDescriptor(descriptionsByType);
 	}
 
 	/**
 	 * Description of an application's scheduled {@link Task Tasks}.
 	 */
-	public static final class ScheduledTasksDescriptor {
+	public static final class ScheduledTasksDescriptor implements OperationResponseBody {
 
 		private final List<TaskDescriptor> cron;
 
@@ -129,8 +132,12 @@ public class ScheduledTasksEndpoint {
 		private final RunnableDescriptor runnable;
 
 		private static TaskDescriptor of(Task task) {
-			return DESCRIBERS.entrySet().stream().filter((entry) -> entry.getKey().isInstance(task))
-					.map((entry) -> entry.getValue().apply(task)).findFirst().orElse(null);
+			return DESCRIBERS.entrySet()
+				.stream()
+				.filter((entry) -> entry.getKey().isInstance(task))
+				.map((entry) -> entry.getValue().apply(task))
+				.findFirst()
+				.orElse(null);
 		}
 
 		private static TaskDescriptor describeTriggerTask(TriggerTask triggerTask) {

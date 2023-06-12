@@ -29,6 +29,7 @@ dependencies {
 	optional("com.oracle.database.jdbc:ucp")
 	optional("com.oracle.database.jdbc:ojdbc8")
 	optional("com.samskivert:jmustache")
+	optional("com.squareup.okhttp3:okhttp")
 	optional("com.zaxxer:HikariCP")
 	optional("io.netty:netty-tcnative-boringssl-static")
 	optional("io.projectreactor:reactor-tools")
@@ -36,9 +37,7 @@ dependencies {
 	optional("io.r2dbc:r2dbc-pool")
 	optional("io.rsocket:rsocket-core")
 	optional("io.rsocket:rsocket-transport-netty")
-	optional("io.undertow:undertow-servlet-jakarta") {
-		exclude group: "org.jboss.spec.javax.annotation", module: "jboss-annotations-api_1.3_spec"
-	}
+	optional("io.undertow:undertow-servlet")
 	optional("jakarta.jms:jakarta.jms-api")
 	optional("jakarta.persistence:jakarta.persistence-api")
 	optional("jakarta.servlet:jakarta.servlet-api")
@@ -117,6 +116,7 @@ dependencies {
 	testImplementation("org.apache.derby:derby")
 	testImplementation("org.apache.derby:derbytools")
 	testImplementation("org.awaitility:awaitility")
+	testImplementation("org.codehaus.janino:janino")
 	testImplementation("org.eclipse.jetty:jetty-client")
 	testImplementation("org.eclipse.jetty.http2:http2-client")
 	testImplementation("org.eclipse.jetty.http2:http2-http-client-transport")
@@ -125,7 +125,9 @@ dependencies {
 	}
 	testImplementation("org.hsqldb:hsqldb")
 	testImplementation("org.junit.jupiter:junit-jupiter")
-	testImplementation("org.mariadb.jdbc:mariadb-java-client")
+	testImplementation("org.mariadb.jdbc:mariadb-java-client") {
+		exclude group: "org.slf4j", module: "jcl-over-slf4j"
+	}
 	testImplementation("org.mockito:mockito-core")
 	testImplementation("org.mockito:mockito-junit-jupiter")
 	testImplementation("org.springframework:spring-context-support")

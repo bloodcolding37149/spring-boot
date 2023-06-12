@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,6 +111,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InOrder;
 
+import org.springframework.boot.ssl.DefaultSslBundleRegistry;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslStoreBundle;
+import org.springframework.boot.ssl.jks.JksSslStoreBundle;
+import org.springframework.boot.ssl.jks.JksSslStoreDetails;
+import org.springframework.boot.ssl.pem.PemSslStoreBundle;
+import org.springframework.boot.ssl.pem.PemSslStoreDetails;
 import org.springframework.boot.system.ApplicationHome;
 import org.springframework.boot.system.ApplicationTemp;
 import org.springframework.boot.testsupport.system.CapturedOutput;
@@ -170,6 +177,7 @@ import static org.mockito.Mockito.mock;
  * @author Raja Kolli
  * @author Scott Frederick
  */
+@SuppressWarnings("removal")
 @ExtendWith(OutputCaptureExtension.class)
 @DirtiesUrlFactories
 public abstract class AbstractServletWebServerFactoryTests {
@@ -182,7 +190,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 	private final HttpClientContext httpClientContext = HttpClientContext.create();
 
 	private final Supplier<HttpClientBuilder> httpClientBuilder = () -> HttpClients.custom()
-			.setRetryStrategy(new DefaultHttpRequestRetryStrategy(10, TimeValue.of(200, TimeUnit.MILLISECONDS)));
+		.setRetryStrategy(new DefaultHttpRequestRetryStrategy(10, TimeValue.of(200, TimeUnit.MILLISECONDS)));
 
 	@AfterEach
 	void tearDown() {
@@ -194,6 +202,10 @@ public abstract class AbstractServletWebServerFactoryTests {
 				// Ignore
 			}
 		}
+	}
+
+	protected boolean isCookieCommentSupported() {
+		return true;
 	}
 
 	@Test
@@ -275,10 +287,10 @@ public abstract class AbstractServletWebServerFactoryTests {
 		AbstractServletWebServerFactory factory = getFactory();
 		final InitCountingServlet servlet = new InitCountingServlet();
 		this.webServer = factory
-				.getWebServer((servletContext) -> servletContext.addServlet("test", servlet).setLoadOnStartup(1));
-		assertThat(servlet.getInitCount()).isEqualTo(0);
+			.getWebServer((servletContext) -> servletContext.addServlet("test", servlet).setLoadOnStartup(1));
+		assertThat(servlet.getInitCount()).isZero();
 		this.webServer.start();
-		assertThat(servlet.getInitCount()).isEqualTo(1);
+		assertThat(servlet.getInitCount()).isOne();
 	}
 
 	@Test
@@ -325,19 +337,19 @@ public abstract class AbstractServletWebServerFactoryTests {
 	@Test
 	void contextPathMustStartWithSlash() {
 		assertThatIllegalArgumentException().isThrownBy(() -> getFactory().setContextPath("missingslash"))
-				.withMessageContaining("ContextPath must start with '/' and not end with '/'");
+			.withMessageContaining("ContextPath must start with '/' and not end with '/'");
 	}
 
 	@Test
 	void contextPathMustNotEndWithSlash() {
 		assertThatIllegalArgumentException().isThrownBy(() -> getFactory().setContextPath("extraslash/"))
-				.withMessageContaining("ContextPath must start with '/' and not end with '/'");
+			.withMessageContaining("ContextPath must start with '/' and not end with '/'");
 	}
 
 	@Test
 	void contextRootPathMustNotBeSlash() {
 		assertThatIllegalArgumentException().isThrownBy(() -> getFactory().setContextPath("/"))
-				.withMessageContaining("Root ContextPath must be specified using an empty string");
+			.withMessageContaining("Root ContextPath must be specified using an empty string");
 	}
 
 	@Test
@@ -376,7 +388,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		this.webServer = factory.getWebServer();
 		this.webServer.start();
 		ClientHttpResponse response = getClientResponse(getLocalUrl("/test.xxcss"));
-		assertThat(response.getHeaders().getContentType().toString()).isEqualTo("text/css");
+		assertThat(response.getHeaders().getContentType()).hasToString("text/css");
 		response.close();
 	}
 
@@ -422,7 +434,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThatExceptionOfType(SSLException.class)
-				.isThrownBy(() -> getResponse(getLocalUrl("https", "/hello"), requestFactory));
+			.isThrownBy(() -> getResponse(getLocalUrl("https", "/hello"), requestFactory));
 	}
 
 	@Test
@@ -446,10 +458,11 @@ public abstract class AbstractServletWebServerFactoryTests {
 				new ExampleServlet(true, false), "/hello");
 		this.webServer = factory.getWebServer(registration);
 		this.webServer.start();
-		TrustStrategy trustStrategy = new SerialNumberValidatingTrustSelfSignedStrategy("3a3aaec8");
+		TrustStrategy trustStrategy = new SerialNumberValidatingTrustSelfSignedStrategy("14ca9ba6abe2a70d");
 		SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, trustStrategy).build();
 		PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-				.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContext)).build();
+			.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContext))
+			.build();
 		HttpClient httpClient = HttpClients.custom().setConnectionManager(connectionManager).build();
 		String response = getResponse(getLocalUrl("https", "/hello"),
 				new HttpComponentsClientHttpRequestFactory(httpClient));
@@ -468,7 +481,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 	}
 
 	protected void assertThatSslWithInvalidAliasCallFails(ThrowingCallable call) {
-		assertThatThrownBy(call).hasStackTraceContaining("Keystore does not contain specified alias 'test-alias-404'");
+		assertThatThrownBy(call).hasStackTraceContaining("Keystore does not contain alias 'test-alias-404'");
 	}
 
 	@Test
@@ -480,7 +493,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build());
 		PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-				.setSSLSocketFactory(socketFactory).build();
+			.setSSLSocketFactory(socketFactory)
+			.build();
 		HttpClient httpClient = this.httpClientBuilder.get().setConnectionManager(connectionManager).build();
 		ClientHttpResponse response = getClientResponse(getLocalUrl("https", "/hello"), HttpMethod.GET,
 				new HttpComponentsClientHttpRequestFactory(httpClient));
@@ -497,7 +511,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build());
 		PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-				.setSSLSocketFactory(socketFactory).build();
+			.setSSLSocketFactory(socketFactory)
+			.build();
 		HttpClient httpClient = this.httpClientBuilder.get().setConnectionManager(connectionManager).build();
 		ClientHttpResponse response = getClientResponse(getLocalUrl("https", "/hello"), HttpMethod.GET,
 				new HttpComponentsClientHttpRequestFactory(httpClient));
@@ -527,7 +542,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		loadStore(keyStore, new FileSystemResource("src/test/resources/test.p12"));
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-						.loadKeyMaterial(keyStore, "secret".toCharArray()).build());
+					.loadKeyMaterial(keyStore, "secret".toCharArray())
+					.build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
 	}
@@ -543,7 +559,46 @@ public abstract class AbstractServletWebServerFactoryTests {
 		loadStore(keyStore, new FileSystemResource("src/test/resources/test.p12"));
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-						.loadKeyMaterial(keyStore, "secret".toCharArray()).build());
+					.loadKeyMaterial(keyStore, "secret".toCharArray())
+					.build());
+		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
+		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
+	}
+
+	@Test
+	void pkcs12KeyStoreAndTrustStoreFromBundle() throws Exception {
+		AbstractServletWebServerFactory factory = getFactory();
+		addTestTxtFile(factory);
+		factory.setSsl(Ssl.forBundle("test"));
+		factory.setSslBundles(
+				new DefaultSslBundleRegistry("test", createJksSslBundle("classpath:test.p12", "classpath:test.p12")));
+		this.webServer = factory.getWebServer();
+		this.webServer.start();
+		KeyStore keyStore = KeyStore.getInstance("pkcs12");
+		loadStore(keyStore, new FileSystemResource("src/test/resources/test.p12"));
+		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
+				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
+					.loadKeyMaterial(keyStore, "secret".toCharArray())
+					.build());
+		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
+		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
+	}
+
+	@Test
+	void pemKeyStoreAndTrustStoreFromBundle() throws Exception {
+		AbstractServletWebServerFactory factory = getFactory();
+		addTestTxtFile(factory);
+		factory.setSsl(Ssl.forBundle("test"));
+		factory.setSslBundles(new DefaultSslBundleRegistry("test",
+				createPemSslBundle("classpath:test-cert.pem", "classpath:test-key.pem")));
+		this.webServer = factory.getWebServer();
+		this.webServer.start();
+		KeyStore keyStore = KeyStore.getInstance("pkcs12");
+		loadStore(keyStore, new FileSystemResource("src/test/resources/test.p12"));
+		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
+				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
+					.loadKeyMaterial(keyStore, "secret".toCharArray())
+					.build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
 	}
@@ -560,7 +615,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		loadStore(keyStore, new FileSystemResource("src/test/resources/test.jks"));
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-						.loadKeyMaterial(keyStore, "password".toCharArray()).build());
+					.loadKeyMaterial(keyStore, "password".toCharArray())
+					.build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
 	}
@@ -583,15 +639,16 @@ public abstract class AbstractServletWebServerFactoryTests {
 	void sslWantsClientAuthenticationSucceedsWithClientCertificate() throws Exception {
 		AbstractServletWebServerFactory factory = getFactory();
 		addTestTxtFile(factory);
-		factory.setSsl(
-				getSsl(ClientAuth.WANT, "password", "classpath:test.jks", null, new String[] { "TLSv1.2" }, null));
+		factory
+			.setSsl(getSsl(ClientAuth.WANT, "password", "classpath:test.jks", null, new String[] { "TLSv1.2" }, null));
 		this.webServer = factory.getWebServer();
 		this.webServer.start();
 		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 		loadStore(keyStore, new FileSystemResource("src/test/resources/test.jks"));
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-						.loadKeyMaterial(keyStore, "password".toCharArray()).build());
+					.loadKeyMaterial(keyStore, "password".toCharArray())
+					.build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
 	}
@@ -610,6 +667,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 	}
 
 	@Test
+	@Deprecated(since = "3.1.0", forRemoval = true)
 	void sslWithCustomSslStoreProvider() throws Exception {
 		AbstractServletWebServerFactory factory = getFactory();
 		addTestTxtFile(factory);
@@ -627,7 +685,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		loadStore(keyStore, new FileSystemResource("src/test/resources/test.jks"));
 		SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
 				new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy())
-						.loadKeyMaterial(keyStore, "password".toCharArray()).build());
+					.loadKeyMaterial(keyStore, "password".toCharArray())
+					.build());
 		HttpComponentsClientHttpRequestFactory requestFactory = createHttpComponentsRequestFactory(socketFactory);
 		assertThat(getResponse(getLocalUrl("https", "/test.txt"), requestFactory)).isEqualTo("test");
 		then(sslStoreProvider).should(atLeastOnce()).getKeyStore();
@@ -703,6 +762,24 @@ public abstract class AbstractServletWebServerFactoryTests {
 		return ssl;
 	}
 
+	private SslBundle createJksSslBundle(String keyStore, String trustStore) {
+		JksSslStoreDetails keyStoreDetails = getJksStoreDetails(keyStore);
+		JksSslStoreDetails trustStoreDetails = getJksStoreDetails(trustStore);
+		SslStoreBundle stores = new JksSslStoreBundle(keyStoreDetails, trustStoreDetails);
+		return SslBundle.of(stores);
+	}
+
+	private JksSslStoreDetails getJksStoreDetails(String location) {
+		return new JksSslStoreDetails(getStoreType(location), null, location, "secret");
+	}
+
+	private SslBundle createPemSslBundle(String cert, String privateKey) {
+		PemSslStoreDetails keyStoreDetails = PemSslStoreDetails.forCertificate(cert).withPrivateKey(privateKey);
+		PemSslStoreDetails trustStoreDetails = PemSslStoreDetails.forCertificate(cert);
+		SslStoreBundle stores = new PemSslStoreBundle(keyStoreDetails, trustStoreDetails);
+		return SslBundle.of(stores);
+	}
+
 	protected void testRestrictedSSLProtocolsAndCipherSuites(String[] protocols, String[] ciphers) throws Exception {
 		AbstractServletWebServerFactory factory = getFactory();
 		factory.setSsl(getSsl(null, "password", "src/test/resources/restricted.jks", null, protocols, ciphers));
@@ -717,7 +794,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 	private HttpComponentsClientHttpRequestFactory createHttpComponentsRequestFactory(
 			SSLConnectionSocketFactory socketFactory) {
 		PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-				.setSSLSocketFactory(socketFactory).build();
+			.setSSLSocketFactory(socketFactory)
+			.build();
 		HttpClient httpClient = this.httpClientBuilder.get().setConnectionManager(connectionManager).build();
 		HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
 		return requestFactory;
@@ -768,8 +846,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 	void getValidSessionStoreWhenSessionStoreNotSet() {
 		AbstractServletWebServerFactory factory = getFactory();
 		File dir = factory.getValidSessionStoreDir(false);
-		assertThat(dir.getName()).isEqualTo("servlet-sessions");
-		assertThat(dir.getParentFile()).isEqualTo(new ApplicationTemp().getDir());
+		assertThat(dir).hasName("servlet-sessions");
+		assertThat(dir).hasParent(new ApplicationTemp().getDir());
 	}
 
 	@Test
@@ -777,8 +855,8 @@ public abstract class AbstractServletWebServerFactoryTests {
 		AbstractServletWebServerFactory factory = getFactory();
 		factory.getSession().setStoreDir(new File("sessions"));
 		File dir = factory.getValidSessionStoreDir(false);
-		assertThat(dir.getName()).isEqualTo("sessions");
-		assertThat(dir.getParentFile()).isEqualTo(new ApplicationHome().getDir());
+		assertThat(dir).hasName("sessions");
+		assertThat(dir).hasParent(new ApplicationHome().getDir());
 	}
 
 	@Test
@@ -788,10 +866,11 @@ public abstract class AbstractServletWebServerFactoryTests {
 		file.createNewFile();
 		factory.getSession().setStoreDir(file);
 		assertThatIllegalStateException().isThrownBy(() -> factory.getValidSessionStoreDir(false))
-				.withMessageContaining("points to a file");
+			.withMessageContaining("points to a file");
 	}
 
 	@Test
+	@SuppressWarnings("removal")
 	void sessionCookieConfiguration() {
 		AbstractServletWebServerFactory factory = getFactory();
 		factory.getSession().getCookie().setName("testname");
@@ -807,7 +886,9 @@ public abstract class AbstractServletWebServerFactoryTests {
 		assertThat(sessionCookieConfig.getName()).isEqualTo("testname");
 		assertThat(sessionCookieConfig.getDomain()).isEqualTo("testdomain");
 		assertThat(sessionCookieConfig.getPath()).isEqualTo("/testpath");
-		assertThat(sessionCookieConfig.getComment()).isEqualTo("testcomment");
+		if (isCookieCommentSupported()) {
+			assertThat(sessionCookieConfig.getComment()).isEqualTo("testcomment");
+		}
 		assertThat(sessionCookieConfig.isHttpOnly()).isTrue();
 		assertThat(sessionCookieConfig.isSecure()).isTrue();
 		assertThat(sessionCookieConfig.getMaxAge()).isEqualTo(60);
@@ -876,7 +957,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		AtomicReference<ServletContext> contextReference = new AtomicReference<>();
 		this.webServer = factory.getWebServer(contextReference::set);
 		assertThat(contextReference.get().getEffectiveSessionTrackingModes())
-				.isEqualTo(EnumSet.of(jakarta.servlet.SessionTrackingMode.SSL));
+			.isEqualTo(EnumSet.of(jakarta.servlet.SessionTrackingMode.SSL));
 	}
 
 	@Test
@@ -927,12 +1008,12 @@ public abstract class AbstractServletWebServerFactoryTests {
 		this.webServer = factory.getWebServer();
 		Map<String, String> configuredMimeMappings = getActualMimeMappings();
 		Collection<MimeMappings.Mapping> expectedMimeMappings = MimeMappings.DEFAULT.getAll();
-		configuredMimeMappings.forEach(
-				(key, value) -> assertThat(expectedMimeMappings).contains(new MimeMappings.Mapping(key, value)));
+		configuredMimeMappings
+			.forEach((key, value) -> assertThat(expectedMimeMappings).contains(new MimeMappings.Mapping(key, value)));
 		for (MimeMappings.Mapping mapping : expectedMimeMappings) {
 			assertThat(configuredMimeMappings).containsEntry(mapping.getExtension(), mapping.getMimeType());
 		}
-		assertThat(configuredMimeMappings.size()).isEqualTo(expectedMimeMappings.size());
+		assertThat(configuredMimeMappings).hasSameSizeAs(expectedMimeMappings);
 	}
 
 	@Test
@@ -1062,6 +1143,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 	}
 
 	@Test
+	@SuppressWarnings("removal")
 	void sessionConfiguration() {
 		AbstractServletWebServerFactory factory = getFactory();
 		factory.getSession().setTimeout(Duration.ofSeconds(123));
@@ -1076,12 +1158,14 @@ public abstract class AbstractServletWebServerFactoryTests {
 		AtomicReference<ServletContext> contextReference = new AtomicReference<>();
 		factory.getWebServer(contextReference::set).start();
 		ServletContext servletContext = contextReference.get();
-		assertThat(servletContext.getEffectiveSessionTrackingModes()).isEqualTo(
-				EnumSet.of(jakarta.servlet.SessionTrackingMode.COOKIE, jakarta.servlet.SessionTrackingMode.URL));
+		assertThat(servletContext.getEffectiveSessionTrackingModes())
+			.isEqualTo(EnumSet.of(jakarta.servlet.SessionTrackingMode.COOKIE, jakarta.servlet.SessionTrackingMode.URL));
 		assertThat(servletContext.getSessionCookieConfig().getName()).isEqualTo("testname");
 		assertThat(servletContext.getSessionCookieConfig().getDomain()).isEqualTo("testdomain");
 		assertThat(servletContext.getSessionCookieConfig().getPath()).isEqualTo("/testpath");
-		assertThat(servletContext.getSessionCookieConfig().getComment()).isEqualTo("testcomment");
+		if (isCookieCommentSupported()) {
+			assertThat(servletContext.getSessionCookieConfig().getComment()).isEqualTo("testcomment");
+		}
 		assertThat(servletContext.getSessionCookieConfig().isHttpOnly()).isTrue();
 		assertThat(servletContext.getSessionCookieConfig().isSecure()).isTrue();
 		assertThat(servletContext.getSessionCookieConfig().getMaxAge()).isEqualTo(60);
@@ -1100,9 +1184,9 @@ public abstract class AbstractServletWebServerFactoryTests {
 	void exceptionThrownOnLoadFailureIsRethrown() {
 		AbstractServletWebServerFactory factory = getFactory();
 		this.webServer = factory
-				.getWebServer((context) -> context.addServlet("failing", FailingServlet.class).setLoadOnStartup(0));
+			.getWebServer((context) -> context.addServlet("failing", FailingServlet.class).setLoadOnStartup(0));
 		assertThatExceptionOfType(WebServerException.class).isThrownBy(this.webServer::start)
-				.satisfies(this::wrapsFailingServletException);
+			.satisfies(this::wrapsFailingServletException);
 	}
 
 	@Test
@@ -1167,7 +1251,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		AbstractServletWebServerFactory factory = getFactory();
 		BlockingServlet blockingServlet = new BlockingServlet();
 		this.webServer = factory
-				.getWebServer((context) -> context.addServlet("blockingServlet", blockingServlet).addMapping("/"));
+			.getWebServer((context) -> context.addServlet("blockingServlet", blockingServlet).addMapping("/"));
 		this.webServer.start();
 		int port = this.webServer.getPort();
 		initiateGetRequest(port, "/");
@@ -1219,7 +1303,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		factory.setShutdown(Shutdown.GRACEFUL);
 		BlockingServlet blockingServlet = new BlockingServlet();
 		this.webServer = factory
-				.getWebServer((context) -> context.addServlet("blockingServlet", blockingServlet).addMapping("/"));
+			.getWebServer((context) -> context.addServlet("blockingServlet", blockingServlet).addMapping("/"));
 		this.webServer.start();
 		int port = this.webServer.getPort();
 		initiateGetRequest(port, "/");
@@ -1228,7 +1312,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		this.webServer.shutDownGracefully(result::set);
 		this.webServer.stop();
 		assertThat(Awaitility.await().atMost(Duration.ofSeconds(30)).until(result::get, Objects::nonNull))
-				.isEqualTo(GracefulShutdownResult.REQUESTS_ACTIVE);
+			.isEqualTo(GracefulShutdownResult.REQUESTS_ACTIVE);
 		try {
 			blockingServlet.admitOne();
 		}
@@ -1288,8 +1372,10 @@ public abstract class AbstractServletWebServerFactoryTests {
 		LinkedHashMap<String, InputStreamFactory> contentDecoderMap = new LinkedHashMap<>();
 		contentDecoderMap.put("gzip", inputStreamFactory);
 		String response = getResponse(getLocalUrl("/test.txt"), method,
-				new HttpComponentsClientHttpRequestFactory(HttpClientBuilder.create().setUserAgent("testUserAgent")
-						.setContentDecoderRegistry(contentDecoderMap).build()));
+				new HttpComponentsClientHttpRequestFactory(HttpClientBuilder.create()
+					.setUserAgent("testUserAgent")
+					.setContentDecoderRegistry(contentDecoderMap)
+					.build()));
 		assertThat(response).isEqualTo(testContent);
 		return inputStreamFactory.wasCompressionUsed();
 	}
@@ -1402,7 +1488,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		this.webServer = factory.getWebServer(new ServletRegistrationBean<>(new ExampleServlet(true, false), "/hello"));
 		this.webServer.start();
 		assertThat(getResponse(getLocalUrl("/hello"), "X-Forwarded-For:140.211.11.130"))
-				.contains("remoteaddr=140.211.11.130");
+			.contains("remoteaddr=140.211.11.130");
 	}
 
 	protected abstract AbstractServletWebServerFactory getFactory();
@@ -1460,15 +1546,12 @@ public abstract class AbstractServletWebServerFactoryTests {
 
 	protected final void doWithBlockedPort(BlockedPortAction action) throws Exception {
 		ServerSocket serverSocket = new ServerSocket();
-		int blockedPort = doWithRetry(() -> {
-			serverSocket.bind(null);
-			return serverSocket.getLocalPort();
-		});
-		try {
+		try (serverSocket) {
+			int blockedPort = doWithRetry(() -> {
+				serverSocket.bind(null);
+				return serverSocket.getLocalPort();
+			});
 			action.run(blockedPort);
-		}
-		finally {
-			serverSocket.close();
 		}
 	}
 
@@ -1545,7 +1628,7 @@ public abstract class AbstractServletWebServerFactoryTests {
 		@Override
 		public boolean isTrusted(X509Certificate[] chain, String authType) throws CertificateException {
 			String hexSerialNumber = chain[0].getSerialNumber().toString(16);
-			boolean isMatch = hexSerialNumber.equals(this.serialNumber);
+			boolean isMatch = hexSerialNumber.equalsIgnoreCase(this.serialNumber);
 			return super.isTrusted(chain, authType) && isMatch;
 		}
 

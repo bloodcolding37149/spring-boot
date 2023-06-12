@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import java.util.function.Supplier;
 import reactor.netty.http.client.HttpClientRequest;
 
 import org.springframework.beans.BeanUtils;
+import org.springframework.boot.ssl.SslBundle;
 import org.springframework.http.client.ClientHttpRequest;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
@@ -64,6 +65,7 @@ import org.springframework.web.util.UriTemplateHandler;
  * @author Dmytro Nosan
  * @author Kevin Strijbos
  * @author Ilya Lukyanovich
+ * @author Scott Frederick
  * @since 1.4.0
  */
 public class RestTemplateBuilder {
@@ -454,6 +456,19 @@ public class RestTemplateBuilder {
 	}
 
 	/**
+	 * Sets the SSL bundle on the underlying {@link ClientHttpRequestFactory}.
+	 * @param sslBundle the SSL bundle
+	 * @return a new builder instance
+	 * @since 3.1.0
+	 */
+	public RestTemplateBuilder setSslBundle(SslBundle sslBundle) {
+		return new RestTemplateBuilder(this.requestFactorySettings.withSslBundle(sslBundle), this.detectRequestFactory,
+				this.rootUri, this.messageConverters, this.interceptors, this.requestFactory, this.uriTemplateHandler,
+				this.errorHandler, this.basicAuthentication, this.defaultHeaders, this.customizers,
+				this.requestCustomizers);
+	}
+
+	/**
 	 * Set the {@link RestTemplateCustomizer RestTemplateCustomizers} that should be
 	 * applied to the {@link RestTemplate}. Customizers are applied in the order that they
 	 * were added after builder configuration has been applied. Setting this value will
@@ -657,8 +672,9 @@ public class RestTemplateBuilder {
 		if (this.basicAuthentication == null && this.defaultHeaders.isEmpty() && this.requestCustomizers.isEmpty()) {
 			return;
 		}
-		restTemplate.getClientHttpRequestInitializers().add(new RestTemplateBuilderClientHttpRequestInitializer(
-				this.basicAuthentication, this.defaultHeaders, this.requestCustomizers));
+		restTemplate.getClientHttpRequestInitializers()
+			.add(new RestTemplateBuilderClientHttpRequestInitializer(this.basicAuthentication, this.defaultHeaders,
+					this.requestCustomizers));
 	}
 
 	@SuppressWarnings("unchecked")

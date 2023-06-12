@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ class OriginTrackedYamlLoader extends YamlProcessor {
 		loaderOptions.setAllowDuplicateKeys(false);
 		loaderOptions.setMaxAliasesForCollections(Integer.MAX_VALUE);
 		loaderOptions.setAllowRecursiveKeys(true);
+		loaderOptions.setCodePointLimit(Integer.MAX_VALUE);
 		return createYaml(loaderOptions);
 	}
 
@@ -79,7 +80,7 @@ class OriginTrackedYamlLoader extends YamlProcessor {
 	}
 
 	List<Map<String, Object>> load() {
-		final List<Map<String, Object>> result = new ArrayList<>();
+		List<Map<String, Object>> result = new ArrayList<>();
 		process((properties, map) -> result.add(getFlattenedMap(map)));
 		return result;
 	}
@@ -119,7 +120,9 @@ class OriginTrackedYamlLoader extends YamlProcessor {
 		}
 
 		private void replaceMappingNodeKeys(MappingNode node) {
-			node.setValue(node.getValue().stream().map(KeyScalarNode::get).toList());
+			List<NodeTuple> newValue = new ArrayList<>();
+			node.getValue().stream().map(KeyScalarNode::get).forEach(newValue::add);
+			node.setValue(newValue);
 		}
 
 		private Object constructTrackedObject(Node node, Object value) {

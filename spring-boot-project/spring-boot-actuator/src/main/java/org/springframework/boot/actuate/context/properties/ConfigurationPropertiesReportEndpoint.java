@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.beans.BeansException;
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.SanitizableData;
 import org.springframework.boot.actuate.endpoint.Sanitizer;
 import org.springframework.boot.actuate.endpoint.SanitizingFunction;
@@ -188,8 +189,8 @@ public class ConfigurationPropertiesReportEndpoint implements ApplicationContext
 
 	private void applyConfigurationPropertiesFilter(JsonMapper.Builder builder) {
 		builder.annotationIntrospector(new ConfigurationPropertiesAnnotationIntrospector());
-		builder.filterProvider(
-				new SimpleFilterProvider().setDefaultFilter(new ConfigurationPropertiesPropertyFilter()));
+		builder
+			.filterProvider(new SimpleFilterProvider().setDefaultFilter(new ConfigurationPropertiesPropertyFilter()));
 	}
 
 	/**
@@ -198,16 +199,18 @@ public class ConfigurationPropertiesReportEndpoint implements ApplicationContext
 	 */
 	private void applySerializationModifier(JsonMapper.Builder builder) {
 		SerializerFactory factory = BeanSerializerFactory.instance
-				.withSerializerModifier(new GenericSerializerModifier());
+			.withSerializerModifier(new GenericSerializerModifier());
 		builder.serializerFactory(factory);
 	}
 
 	private ContextConfigurationPropertiesDescriptor describeBeans(ObjectMapper mapper, ApplicationContext context,
 			Predicate<ConfigurationPropertiesBean> beanFilterPredicate, boolean showUnsanitized) {
 		Map<String, ConfigurationPropertiesBean> beans = ConfigurationPropertiesBean.getAll(context);
-		Map<String, ConfigurationPropertiesBeanDescriptor> descriptors = beans.values().stream()
-				.filter(beanFilterPredicate).collect(Collectors.toMap(ConfigurationPropertiesBean::getName,
-						(bean) -> describeBean(mapper, bean, showUnsanitized)));
+		Map<String, ConfigurationPropertiesBeanDescriptor> descriptors = beans.values()
+			.stream()
+			.filter(beanFilterPredicate)
+			.collect(Collectors.toMap(ConfigurationPropertiesBean::getName,
+					(bean) -> describeBean(mapper, bean, showUnsanitized)));
 		return new ContextConfigurationPropertiesDescriptor(descriptors,
 				(context.getParent() != null) ? context.getParent().getId() : null);
 	}
@@ -507,9 +510,10 @@ public class ConfigurationPropertiesReportEndpoint implements ApplicationContext
 					names = new String[parameters.length];
 				}
 				for (int i = 0; i < parameters.length; i++) {
-					String name = MergedAnnotations.from(parameters[i]).get(Name.class)
-							.getValue(MergedAnnotation.VALUE, String.class)
-							.orElse((names[i] != null) ? names[i] : parameters[i].getName());
+					String name = MergedAnnotations.from(parameters[i])
+						.get(Name.class)
+						.getValue(MergedAnnotation.VALUE, String.class)
+						.orElse((names[i] != null) ? names[i] : parameters[i].getName());
 					if (name.equals(writer.getName())) {
 						return true;
 					}
@@ -564,7 +568,7 @@ public class ConfigurationPropertiesReportEndpoint implements ApplicationContext
 	 * Description of an application's
 	 * {@link ConfigurationProperties @ConfigurationProperties} beans.
 	 */
-	public static final class ConfigurationPropertiesDescriptor {
+	public static final class ConfigurationPropertiesDescriptor implements OperationResponseBody {
 
 		private final Map<String, ContextConfigurationPropertiesDescriptor> contexts;
 

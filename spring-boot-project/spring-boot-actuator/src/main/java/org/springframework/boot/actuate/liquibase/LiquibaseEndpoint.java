@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.integration.spring.SpringLiquibase;
 
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.context.ApplicationContext;
@@ -62,7 +63,7 @@ public class LiquibaseEndpoint {
 			Map<String, LiquibaseBeanDescriptor> liquibaseBeans = new HashMap<>();
 			DatabaseFactory factory = DatabaseFactory.getInstance();
 			target.getBeansOfType(SpringLiquibase.class)
-					.forEach((name, liquibase) -> liquibaseBeans.put(name, createReport(liquibase, factory)));
+				.forEach((name, liquibase) -> liquibaseBeans.put(name, createReport(liquibase, factory)));
 			ApplicationContext parent = target.getParent();
 			contextBeans.put(target.getId(),
 					new ContextLiquibaseBeansDescriptor(liquibaseBeans, (parent != null) ? parent.getId() : null));
@@ -106,7 +107,7 @@ public class LiquibaseEndpoint {
 	/**
 	 * Description of an application's {@link SpringLiquibase} beans.
 	 */
-	public static final class LiquibaseBeansDescriptor {
+	public static final class LiquibaseBeansDescriptor implements OperationResponseBody {
 
 		private final Map<String, ContextLiquibaseBeansDescriptor> contexts;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import org.springframework.boot.jackson.scan.a.RenameMixInClass;
 import org.springframework.boot.jackson.scan.b.RenameMixInAbstractClass;
 import org.springframework.boot.jackson.scan.c.RenameMixInInterface;
 import org.springframework.boot.jackson.scan.d.EmptyMixInClass;
+import org.springframework.boot.jackson.types.Name;
+import org.springframework.boot.jackson.types.NameAndAge;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.util.ClassUtils;
 
@@ -56,7 +58,7 @@ class JsonMixinModuleTests {
 	@SuppressWarnings("removal")
 	void createWhenContextIsNullShouldThrowException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new JsonMixinModule(null, Collections.emptyList()))
-				.withMessageContaining("Context must not be null");
+			.withMessageContaining("Context must not be null");
 	}
 
 	@Test

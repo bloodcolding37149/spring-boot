@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.annotation.DeleteOperation;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
@@ -108,14 +109,22 @@ public class CachesEndpoint {
 
 	private List<CacheEntryDescriptor> getCacheEntries(Predicate<String> cacheNamePredicate,
 			Predicate<String> cacheManagerNamePredicate) {
-		return this.cacheManagers.keySet().stream().filter(cacheManagerNamePredicate)
-				.flatMap((cacheManagerName) -> getCacheEntries(cacheManagerName, cacheNamePredicate).stream()).toList();
+		return this.cacheManagers.keySet()
+			.stream()
+			.filter(cacheManagerNamePredicate)
+			.flatMap((cacheManagerName) -> getCacheEntries(cacheManagerName, cacheNamePredicate).stream())
+			.toList();
 	}
 
 	private List<CacheEntryDescriptor> getCacheEntries(String cacheManagerName, Predicate<String> cacheNamePredicate) {
 		CacheManager cacheManager = this.cacheManagers.get(cacheManagerName);
-		return cacheManager.getCacheNames().stream().filter(cacheNamePredicate).map(cacheManager::getCache)
-				.filter(Objects::nonNull).map((cache) -> new CacheEntryDescriptor(cache, cacheManagerName)).toList();
+		return cacheManager.getCacheNames()
+			.stream()
+			.filter(cacheNamePredicate)
+			.map(cacheManager::getCache)
+			.filter(Objects::nonNull)
+			.map((cache) -> new CacheEntryDescriptor(cache, cacheManagerName))
+			.toList();
 	}
 
 	private CacheEntryDescriptor extractUniqueCacheEntry(String cache, List<CacheEntryDescriptor> entries) {
@@ -148,7 +157,7 @@ public class CachesEndpoint {
 	/**
 	 * Description of the caches.
 	 */
-	public static final class CachesDescriptor {
+	public static final class CachesDescriptor implements OperationResponseBody {
 
 		private final Map<String, CacheManagerDescriptor> cacheManagers;
 
@@ -182,7 +191,7 @@ public class CachesEndpoint {
 	/**
 	 * Description of a {@link Cache}.
 	 */
-	public static class CacheDescriptor {
+	public static class CacheDescriptor implements OperationResponseBody {
 
 		private final String target;
 

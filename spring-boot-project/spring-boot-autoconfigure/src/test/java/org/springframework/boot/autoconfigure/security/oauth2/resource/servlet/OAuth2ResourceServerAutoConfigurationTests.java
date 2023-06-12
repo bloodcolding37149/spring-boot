@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import okhttp3.mockwebserver.MockWebServer;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
@@ -43,6 +44,7 @@ import org.springframework.boot.test.context.assertj.AssertableWebApplicationCon
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -67,6 +69,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -79,9 +83,9 @@ import static org.mockito.Mockito.mock;
  */
 class OAuth2ResourceServerAutoConfigurationTests {
 
-	private WebApplicationContextRunner contextRunner = new WebApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(OAuth2ResourceServerAutoConfiguration.class))
-			.withUserConfiguration(TestConfig.class);
+	private final WebApplicationContextRunner contextRunner = new WebApplicationContextRunner()
+		.withConfiguration(AutoConfigurations.of(OAuth2ResourceServerAutoConfiguration.class))
+		.withUserConfiguration(TestConfig.class);
 
 	private MockWebServer server;
 
@@ -101,74 +105,89 @@ class OAuth2ResourceServerAutoConfigurationTests {
 	@Test
 	void autoConfigurationShouldConfigureResourceServer() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+				assertJwkSetUriJwtDecoderBuilderCustomization(context);
+			});
+	}
+
+	private void assertJwkSetUriJwtDecoderBuilderCustomization(AssertableWebApplicationContext context) {
+		JwkSetUriJwtDecoderBuilderCustomizer customizer = context.getBean("decoderBuilderCustomizer",
+				JwkSetUriJwtDecoderBuilderCustomizer.class);
+		JwkSetUriJwtDecoderBuilderCustomizer anotherCustomizer = context.getBean("anotherDecoderBuilderCustomizer",
+				JwkSetUriJwtDecoderBuilderCustomizer.class);
+		InOrder inOrder = inOrder(customizer, anotherCustomizer);
+		inOrder.verify(customizer).customize(any());
+		inOrder.verify(anotherCustomizer).customize(any());
 	}
 
 	@Test
 	void autoConfigurationShouldMatchDefaultJwsAlgorithm() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.run((context) -> {
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
-							.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
-							.containsExactlyInAnyOrder(JWSAlgorithm.RS256);
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.run((context) -> {
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
+					.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
+					.containsExactlyInAnyOrder(JWSAlgorithm.RS256);
+			});
 	}
 
 	@Test
 	void autoConfigurationShouldConfigureResourceServerWithSingleJwsAlgorithm() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
-						"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS384")
-				.run((context) -> {
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
-							.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
-							.containsExactlyInAnyOrder(JWSAlgorithm.RS384);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
+					"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS384")
+			.run((context) -> {
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
+					.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
+					.containsExactlyInAnyOrder(JWSAlgorithm.RS384);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+			});
 	}
 
 	@Test
 	void autoConfigurationShouldConfigureResourceServerWithMultipleJwsAlgorithms() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
-						"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS256, RS384, RS512")
-				.run((context) -> {
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
-							.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
-							.containsExactlyInAnyOrder(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
+					"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS256, RS384, RS512")
+			.run((context) -> {
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				assertThat(jwtDecoder).extracting("jwtProcessor.jwsKeySelector.jwsAlgs")
+					.asInstanceOf(InstanceOfAssertFactories.collection(JWSAlgorithm.class))
+					.containsExactlyInAnyOrder(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+			});
 	}
 
 	@Test
 	void autoConfigurationUsingPublicKeyValueShouldConfigureResourceServerUsingSingleJwsAlgorithm() {
-		this.contextRunner.withPropertyValues(
-				"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
-				"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS384").run((context) -> {
-					NimbusJwtDecoder nimbusJwtDecoder = context.getBean(NimbusJwtDecoder.class);
-					assertThat(nimbusJwtDecoder).extracting("jwtProcessor.jwsKeySelector.expectedJWSAlg")
-							.isEqualTo(JWSAlgorithm.RS384);
-				});
+		this.contextRunner
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
+					"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RS384")
+			.run((context) -> {
+				NimbusJwtDecoder nimbusJwtDecoder = context.getBean(NimbusJwtDecoder.class);
+				assertThat(nimbusJwtDecoder).extracting("jwtProcessor.jwsKeySelector.expectedJWSAlg")
+					.isEqualTo(JWSAlgorithm.RS384);
+			});
 	}
 
 	@Test
 	void autoConfigurationUsingPublicKeyValueWithMultipleJwsAlgorithmsShouldFail() {
-		this.contextRunner.withPropertyValues(
-				"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
-				"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RSA256,RS384").run((context) -> {
-					assertThat(context).hasFailed();
-					assertThat(context.getStartupFailure()).hasRootCauseMessage(
-							"Creating a JWT decoder using a public key requires exactly one JWS algorithm but 2 were "
-									+ "configured");
-				});
+		this.contextRunner
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
+					"spring.security.oauth2.resourceserver.jwt.jws-algorithms=RSA256,RS384")
+			.run((context) -> {
+				assertThat(context).hasFailed();
+				assertThat(context.getStartupFailure()).hasRootCauseMessage(
+						"Creating a JWT decoder using a public key requires exactly one JWS algorithm but 2 were "
+								+ "configured");
+			});
 	}
 
 	@Test
@@ -180,15 +199,18 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String issuer = this.server.url(path).toString();
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponse(cleanIssuerPath);
-		this.contextRunner.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
-				+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path).run((context) -> {
-					assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
-					assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
-					SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
-					Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
-							.getField(supplierJwtDecoderBean, "jwtDecoderSupplier");
-					jwtDecoderSupplier.get();
-				});
+		this.contextRunner
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
+					+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path)
+			.run((context) -> {
+				assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
+				assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
+				SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
+				Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
+					.getField(supplierJwtDecoderBean, "delegate");
+				jwtDecoderSupplier.get();
+				assertJwkSetUriJwtDecoderBuilderCustomization(context);
+			});
 		// The last request is to the JWK Set endpoint to look up the algorithm
 		assertThat(this.server.getRequestCount()).isEqualTo(2);
 	}
@@ -202,15 +224,18 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String issuer = this.server.url(path).toString();
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponsesWithErrors(cleanIssuerPath, 1);
-		this.contextRunner.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
-				+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path).run((context) -> {
-					assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
-					assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
-					SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
-					Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
-							.getField(supplierJwtDecoderBean, "jwtDecoderSupplier");
-					jwtDecoderSupplier.get();
-				});
+		this.contextRunner
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
+					+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path)
+			.run((context) -> {
+				assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
+				assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
+				SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
+				Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
+					.getField(supplierJwtDecoderBean, "delegate");
+				jwtDecoderSupplier.get();
+				assertJwkSetUriJwtDecoderBuilderCustomization(context);
+			});
 		// The last request is to the JWK Set endpoint to look up the algorithm
 		assertThat(this.server.getRequestCount()).isEqualTo(3);
 	}
@@ -225,15 +250,18 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponsesWithErrors(cleanIssuerPath, 2);
 
-		this.contextRunner.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
-				+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path).run((context) -> {
-					assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
-					assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
-					SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
-					Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
-							.getField(supplierJwtDecoderBean, "jwtDecoderSupplier");
-					jwtDecoderSupplier.get();
-				});
+		this.contextRunner
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=http://"
+					+ this.server.getHostName() + ":" + this.server.getPort() + "/" + path)
+			.run((context) -> {
+				assertThat(context).hasSingleBean(SupplierJwtDecoder.class);
+				assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
+				SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
+				Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
+					.getField(supplierJwtDecoderBean, "delegate");
+				jwtDecoderSupplier.get();
+				assertJwkSetUriJwtDecoderBuilderCustomization(context);
+			});
 		// The last request is to the JWK Set endpoint to look up the algorithm
 		assertThat(this.server.getRequestCount()).isEqualTo(4);
 	}
@@ -246,46 +274,48 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponse(cleanIssuerPath);
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-				});
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+			});
 	}
 
 	@Test
 	void autoConfigurationShouldFailIfPublicKeyLocationDoesNotExist() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:does-not-exist")
-				.run((context) -> assertThat(context).hasFailed().getFailure()
-						.hasMessageContaining("class path resource [does-not-exist]")
-						.hasMessageContaining("Public key location does not exist"));
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:does-not-exist")
+			.run((context) -> assertThat(context).hasFailed()
+				.getFailure()
+				.hasMessageContaining("class path resource [does-not-exist]")
+				.hasMessageContaining("Public key location does not exist"));
 	}
 
 	@Test
 	void autoConfigurationShouldFailIfAlgorithmIsInvalid() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
-						"spring.security.oauth2.resourceserver.jwt.jws-algorithms=NOT_VALID")
-				.run((context) -> assertThat(context).hasFailed().getFailure()
-						.hasMessageContaining("signatureAlgorithm cannot be null"));
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
+					"spring.security.oauth2.resourceserver.jwt.jws-algorithms=NOT_VALID")
+			.run((context) -> assertThat(context).hasFailed()
+				.getFailure()
+				.hasMessageContaining("signatureAlgorithm cannot be null"));
 	}
 
 	@Test
 	void autoConfigurationWhenSetUriKeyLocationAndIssuerUriPresentShouldUseSetUri() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer-uri.com",
-						"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
-						"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-					assertThat(context.containsBean("jwtDecoderByJwkKeySetUri")).isTrue();
-					assertThat(context.containsBean("jwtDecoderByIssuerUri")).isFalse();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer-uri.com",
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
+					"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+				assertThat(context.containsBean("jwtDecoderByJwkKeySetUri")).isTrue();
+				assertThat(context.containsBean("jwtDecoderByIssuerUri")).isFalse();
+			});
 	}
 
 	@Test
@@ -296,15 +326,15 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponse(cleanIssuerPath);
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.jwt.issuer-uri=http://" + this.server.getHostName() + ":"
-								+ this.server.getPort(),
-						"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-					assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
-				});
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.issuer-uri=http://" + this.server.getHostName() + ":"
+							+ this.server.getPort(),
+					"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+				assertThat(context.containsBean("jwtDecoderByIssuerUri")).isTrue();
+			});
 	}
 
 	@Test
@@ -315,112 +345,116 @@ class OAuth2ResourceServerAutoConfigurationTests {
 	@Test
 	void jwtDecoderByJwkSetUriIsConditionalOnMissingBean() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.withUserConfiguration(JwtDecoderConfig.class)
-				.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.withUserConfiguration(JwtDecoderConfig.class)
+			.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
 	}
 
 	@Test
 	void jwtDecoderByOidcIssuerUriIsConditionalOnMissingBean() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://jwk-oidc-issuer-location.com")
-				.withUserConfiguration(JwtDecoderConfig.class)
-				.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://jwk-oidc-issuer-location.com")
+			.withUserConfiguration(JwtDecoderConfig.class)
+			.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
 	}
 
 	@Test
 	void autoConfigurationShouldBeConditionalOnResourceServerClass() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.withUserConfiguration(JwtDecoderConfig.class)
-				.withClassLoader(new FilteredClassLoader(BearerTokenAuthenticationToken.class)).run((context) -> {
-					assertThat(context).doesNotHaveBean(OAuth2ResourceServerAutoConfiguration.class);
-					assertThat(getBearerTokenFilter(context)).isNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.withUserConfiguration(JwtDecoderConfig.class)
+			.withClassLoader(new FilteredClassLoader(BearerTokenAuthenticationToken.class))
+			.run((context) -> {
+				assertThat(context).doesNotHaveBean(OAuth2ResourceServerAutoConfiguration.class);
+				assertThat(getBearerTokenFilter(context)).isNull();
+			});
 	}
 
 	@Test
 	void autoConfigurationForJwtShouldBeConditionalOnJwtDecoderClass() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.withUserConfiguration(JwtDecoderConfig.class)
-				.withClassLoader(new FilteredClassLoader(JwtDecoder.class)).run((context) -> {
-					assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
-					assertThat(getBearerTokenFilter(context)).isNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.withUserConfiguration(JwtDecoderConfig.class)
+			.withClassLoader(new FilteredClassLoader(JwtDecoder.class))
+			.run((context) -> {
+				assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
+				assertThat(getBearerTokenFilter(context)).isNull();
+			});
 	}
 
 	@Test
 	void jwtSecurityFilterShouldBeConditionalOnSecurityFilterChainClass() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.withUserConfiguration(JwtDecoderConfig.class)
-				.withClassLoader(new FilteredClassLoader(SecurityFilterChain.class)).run((context) -> {
-					assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
-					assertThat(getBearerTokenFilter(context)).isNull();
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.withUserConfiguration(JwtDecoderConfig.class)
+			.withClassLoader(new FilteredClassLoader(SecurityFilterChain.class))
+			.run((context) -> {
+				assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
+				assertThat(getBearerTokenFilter(context)).isNull();
+			});
 	}
 
 	@Test
 	void opaqueTokenSecurityFilterShouldBeConditionalOnSecurityFilterChainClass() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
-				.withClassLoader(new FilteredClassLoader(SecurityFilterChain.class)).run((context) -> {
-					assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
-					assertThat(getBearerTokenFilter(context)).isNull();
-				});
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
+			.withClassLoader(new FilteredClassLoader(SecurityFilterChain.class))
+			.run((context) -> {
+				assertThat(context).hasSingleBean(OAuth2ResourceServerAutoConfiguration.class);
+				assertThat(getBearerTokenFilter(context)).isNull();
+			});
 	}
 
 	@Test
 	void autoConfigurationWhenJwkSetUriAndIntrospectionUriAvailable() {
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(OpaqueTokenIntrospector.class);
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					assertThat(getBearerTokenFilter(context))
-							.extracting("authenticationManagerResolver.arg$1.providers").asList()
-							.hasAtLeastOneElementOfType(JwtAuthenticationProvider.class);
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(OpaqueTokenIntrospector.class);
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				assertThat(getBearerTokenFilter(context)).extracting("authenticationManagerResolver.arg$1.providers")
+					.asList()
+					.hasAtLeastOneElementOfType(JwtAuthenticationProvider.class);
+			});
 	}
 
 	@Test
 	void autoConfigurationWhenIntrospectionUriAvailableShouldConfigureIntrospectionClient() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(OpaqueTokenIntrospector.class);
-					assertThat(getBearerTokenFilter(context)).isNotNull();
-				});
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(OpaqueTokenIntrospector.class);
+				assertThat(getBearerTokenFilter(context)).isNotNull();
+			});
 	}
 
 	@Test
 	void opaqueTokenIntrospectorIsConditionalOnMissingBean() {
 		this.contextRunner
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com")
-				.withUserConfiguration(OpaqueTokenIntrospectorConfig.class)
-				.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com")
+			.withUserConfiguration(OpaqueTokenIntrospectorConfig.class)
+			.run((context) -> assertThat(getBearerTokenFilter(context)).isNotNull());
 	}
 
 	@Test
 	void autoConfigurationWhenIntrospectionUriAvailableShouldBeConditionalOnClass() {
 		this.contextRunner.withClassLoader(new FilteredClassLoader(BearerTokenAuthenticationToken.class))
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
-				.run((context) -> assertThat(context).doesNotHaveBean(OpaqueTokenIntrospector.class));
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
+			.run((context) -> assertThat(context).doesNotHaveBean(OpaqueTokenIntrospector.class));
 	}
 
 	@Test
@@ -432,16 +466,16 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponse(cleanIssuerPath);
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
-						"spring.security.oauth2.resourceserver.jwt.issuer-uri=http://" + this.server.getHostName() + ":"
-								+ this.server.getPort() + "/" + path)
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					assertThat(jwtDecoder).extracting("jwtValidator.tokenValidators")
-							.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
-							.hasAtLeastOneElementOfType(JwtIssuerValidator.class);
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
+					"spring.security.oauth2.resourceserver.jwt.issuer-uri=http://" + this.server.getHostName() + ":"
+							+ this.server.getPort() + "/" + path)
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				assertThat(jwtDecoder).extracting("jwtValidator.tokenValidators")
+					.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
+					.hasAtLeastOneElementOfType(JwtIssuerValidator.class);
+			});
 	}
 
 	@Test
@@ -453,16 +487,16 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String cleanIssuerPath = cleanIssuerPath(issuer);
 		setupMockResponse(cleanIssuerPath);
 		this.contextRunner
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					assertThat(jwtDecoder).extracting("jwtValidator.tokenValidators")
-							.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
-							.hasExactlyElementsOfTypes(JwtTimestampValidator.class)
-							.doesNotHaveAnyElementsOfTypes(JwtClaimValidator.class)
-							.doesNotHaveAnyElementsOfTypes(JwtIssuerValidator.class);
-				});
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				assertThat(jwtDecoder).extracting("jwtValidator.tokenValidators")
+					.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
+					.hasExactlyElementsOfTypes(JwtTimestampValidator.class)
+					.doesNotHaveAnyElementsOfTypes(JwtClaimValidator.class)
+					.doesNotHaveAnyElementsOfTypes(JwtIssuerValidator.class);
+			});
 	}
 
 	@Test
@@ -478,11 +512,11 @@ class OAuth2ResourceServerAutoConfigurationTests {
 				"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
 				"spring.security.oauth2.resourceserver.jwt.issuer-uri=" + issuerUri,
 				"spring.security.oauth2.resourceserver.jwt.audiences=https://test-audience.com,https://test-audience1.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					validate(issuerUri, jwtDecoder);
-				});
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				validate(issuerUri, jwtDecoder);
+			});
 	}
 
 	@SuppressWarnings("unchecked")
@@ -497,19 +531,19 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		String issuerUri = "http://" + this.server.getHostName() + ":" + this.server.getPort() + "/" + path;
 		this.contextRunner.withPropertyValues("spring.security.oauth2.resourceserver.jwt.issuer-uri=" + issuerUri,
 				"spring.security.oauth2.resourceserver.jwt.audiences=https://test-audience.com,https://test-audience1.com")
-				.run((context) -> {
-					SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
-					Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
-							.getField(supplierJwtDecoderBean, "jwtDecoderSupplier");
-					JwtDecoder jwtDecoder = jwtDecoderSupplier.get();
-					validate(issuerUri, jwtDecoder);
-				});
+			.run((context) -> {
+				SupplierJwtDecoder supplierJwtDecoderBean = context.getBean(SupplierJwtDecoder.class);
+				Supplier<JwtDecoder> jwtDecoderSupplier = (Supplier<JwtDecoder>) ReflectionTestUtils
+					.getField(supplierJwtDecoderBean, "delegate");
+				JwtDecoder jwtDecoder = jwtDecoderSupplier.get();
+				validate(issuerUri, jwtDecoder);
+			});
 	}
 
 	@SuppressWarnings("unchecked")
 	private void validate(String issuerUri, JwtDecoder jwtDecoder) throws MalformedURLException {
 		DelegatingOAuth2TokenValidator<Jwt> jwtValidator = (DelegatingOAuth2TokenValidator<Jwt>) ReflectionTestUtils
-				.getField(jwtDecoder, "jwtValidator");
+			.getField(jwtDecoder, "jwtValidator");
 		Jwt.Builder builder = jwt().claim("aud", Collections.singletonList("https://test-audience.com"));
 		if (issuerUri != null) {
 			builder.claim("iss", new URL(issuerUri));
@@ -517,18 +551,20 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		Jwt jwt = builder.build();
 		assertThat(jwtValidator.validate(jwt).hasErrors()).isFalse();
 		Collection<OAuth2TokenValidator<Jwt>> delegates = (Collection<OAuth2TokenValidator<Jwt>>) ReflectionTestUtils
-				.getField(jwtValidator, "tokenValidators");
+			.getField(jwtValidator, "tokenValidators");
 		validateDelegates(issuerUri, delegates);
 	}
 
 	private void validateDelegates(String issuerUri, Collection<OAuth2TokenValidator<Jwt>> delegates) {
 		assertThat(delegates).hasAtLeastOneElementOfType(JwtClaimValidator.class);
 		OAuth2TokenValidator<Jwt> delegatingValidator = delegates.stream()
-				.filter((v) -> v instanceof DelegatingOAuth2TokenValidator).findFirst().get();
+			.filter((v) -> v instanceof DelegatingOAuth2TokenValidator)
+			.findFirst()
+			.get();
 		if (issuerUri != null) {
 			assertThat(delegatingValidator).extracting("tokenValidators")
-					.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
-					.hasAtLeastOneElementOfType(JwtIssuerValidator.class);
+				.asInstanceOf(InstanceOfAssertFactories.collection(OAuth2TokenValidator.class))
+				.hasAtLeastOneElementOfType(JwtIssuerValidator.class);
 		}
 	}
 
@@ -543,11 +579,11 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		this.contextRunner.withPropertyValues(
 				"spring.security.oauth2.resourceserver.jwt.public-key-location=classpath:public-key-location",
 				"spring.security.oauth2.resourceserver.jwt.audiences=https://test-audience.com,http://test-audience1.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					validate(null, jwtDecoder);
-				});
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				validate(null, jwtDecoder);
+			});
 	}
 
 	@SuppressWarnings("unchecked")
@@ -564,34 +600,35 @@ class OAuth2ResourceServerAutoConfigurationTests {
 				"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com",
 				"spring.security.oauth2.resourceserver.jwt.issuer-uri=" + issuerUri,
 				"spring.security.oauth2.resourceserver.jwt.audiences=https://test-audience.com,https://test-audience1.com")
-				.run((context) -> {
-					assertThat(context).hasSingleBean(JwtDecoder.class);
-					JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
-					DelegatingOAuth2TokenValidator<Jwt> jwtValidator = (DelegatingOAuth2TokenValidator<Jwt>) ReflectionTestUtils
-							.getField(jwtDecoder, "jwtValidator");
-					Jwt jwt = jwt().claim("iss", new URL(issuerUri))
-							.claim("aud", Collections.singletonList("https://other-audience.com")).build();
-					assertThat(jwtValidator.validate(jwt).hasErrors()).isTrue();
-				});
+			.run((context) -> {
+				assertThat(context).hasSingleBean(JwtDecoder.class);
+				JwtDecoder jwtDecoder = context.getBean(JwtDecoder.class);
+				DelegatingOAuth2TokenValidator<Jwt> jwtValidator = (DelegatingOAuth2TokenValidator<Jwt>) ReflectionTestUtils
+					.getField(jwtDecoder, "jwtValidator");
+				Jwt jwt = jwt().claim("iss", new URL(issuerUri))
+					.claim("aud", Collections.singletonList("https://other-audience.com"))
+					.build();
+				assertThat(jwtValidator.validate(jwt).hasErrors()).isTrue();
+			});
 	}
 
 	@Test
 	void jwtSecurityConfigurerBacksOffWhenSecurityFilterChainBeanIsPresent() {
 		this.contextRunner.withConfiguration(AutoConfigurations.of(WebMvcAutoConfiguration.class))
-				.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
-				.withUserConfiguration(JwtDecoderConfig.class, TestSecurityFilterChainConfig.class)
-				.run((context) -> assertThat(context).hasSingleBean(SecurityFilterChain.class));
+			.withPropertyValues("spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://jwk-set-uri.com")
+			.withUserConfiguration(JwtDecoderConfig.class, TestSecurityFilterChainConfig.class)
+			.run((context) -> assertThat(context).hasSingleBean(SecurityFilterChain.class));
 	}
 
 	@Test
 	void opaqueTokenSecurityConfigurerBacksOffWhenSecurityFilterChainBeanIsPresent() {
 		this.contextRunner.withConfiguration(AutoConfigurations.of(WebMvcAutoConfiguration.class))
-				.withUserConfiguration(TestSecurityFilterChainConfig.class)
-				.withPropertyValues(
-						"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
-						"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
-				.run((context) -> assertThat(context).hasSingleBean(SecurityFilterChain.class));
+			.withUserConfiguration(TestSecurityFilterChainConfig.class)
+			.withPropertyValues(
+					"spring.security.oauth2.resourceserver.opaquetoken.introspection-uri=https://check-token.com",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-id=my-client-id",
+					"spring.security.oauth2.resourceserver.opaquetoken.client-secret=my-client-secret")
+			.run((context) -> assertThat(context).hasSingleBean(SecurityFilterChain.class));
 	}
 
 	private Filter getBearerTokenFilter(AssertableWebApplicationContext context) {
@@ -610,8 +647,8 @@ class OAuth2ResourceServerAutoConfigurationTests {
 
 	private void setupMockResponse(String issuer) throws JsonProcessingException {
 		MockResponse mockResponse = new MockResponse().setResponseCode(HttpStatus.OK.value())
-				.setBody(new ObjectMapper().writeValueAsString(getResponse(issuer)))
-				.setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+			.setBody(new ObjectMapper().writeValueAsString(getResponse(issuer)))
+			.setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 		this.server.enqueue(mockResponse);
 		this.server.enqueue(
 				new MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody(JWK_SET));
@@ -645,21 +682,31 @@ class OAuth2ResourceServerAutoConfigurationTests {
 	}
 
 	static Jwt.Builder jwt() {
-		// @formatter:off
 		return Jwt.withTokenValue("token")
-				.header("alg", "none")
-				.expiresAt(Instant.MAX)
-				.issuedAt(Instant.MIN)
-				.issuer("https://issuer.example.org")
-				.jti("jti")
-				.notBefore(Instant.MIN)
-				.subject("mock-test-subject");
-		// @formatter:on
+			.header("alg", "none")
+			.expiresAt(Instant.MAX)
+			.issuedAt(Instant.MIN)
+			.issuer("https://issuer.example.org")
+			.jti("jti")
+			.notBefore(Instant.MIN)
+			.subject("mock-test-subject");
 	}
 
 	@Configuration(proxyBeanMethods = false)
 	@EnableWebSecurity
 	static class TestConfig {
+
+		@Bean
+		@Order(1)
+		JwkSetUriJwtDecoderBuilderCustomizer decoderBuilderCustomizer() {
+			return mock(JwkSetUriJwtDecoderBuilderCustomizer.class);
+		}
+
+		@Bean
+		@Order(2)
+		JwkSetUriJwtDecoderBuilderCustomizer anotherDecoderBuilderCustomizer() {
+			return mock(JwkSetUriJwtDecoderBuilderCustomizer.class);
+		}
 
 	}
 
@@ -692,7 +739,7 @@ class OAuth2ResourceServerAutoConfigurationTests {
 		@Bean
 		SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
 			http.securityMatcher("/**");
-			http.authorizeHttpRequests().anyRequest().authenticated();
+			http.authorizeHttpRequests((requests) -> requests.anyRequest().authenticated());
 			return http.build();
 		}
 

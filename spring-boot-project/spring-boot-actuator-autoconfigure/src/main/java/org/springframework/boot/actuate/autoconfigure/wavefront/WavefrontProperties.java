@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.boot.actuate.autoconfigure.metrics.export.properties.PushRegistryProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,6 +34,7 @@ import org.springframework.util.unit.DataSize;
  * Configuration properties to configure Wavefront.
  *
  * @author Moritz Halbritter
+ * @author Glenn Oppegard
  * @since 3.0.0
  */
 @ConfigurationProperties(prefix = "management.wavefront")
@@ -53,6 +58,11 @@ public class WavefrontProperties {
 	private String apiToken;
 
 	/**
+	 * Application configuration.
+	 */
+	private final Application application = new Application();
+
+	/**
 	 * Sender configuration.
 	 */
 	private final Sender sender = new Sender();
@@ -63,9 +73,13 @@ public class WavefrontProperties {
 	private final Metrics metrics = new Metrics();
 
 	/**
-	 * Tracing configuration.
+	 * Customized span tags for RED metrics.
 	 */
-	private final Tracing tracing = new Tracing();
+	private Set<String> traceDerivedCustomTagKeys = new HashSet<>();
+
+	public Application getApplication() {
+		return this.application;
+	}
 
 	public Sender getSender() {
 		return this.sender;
@@ -73,10 +87,6 @@ public class WavefrontProperties {
 
 	public Metrics getMetrics() {
 		return this.metrics;
-	}
-
-	public Tracing getTracing() {
-		return this.tracing;
 	}
 
 	public URI getUri() {
@@ -147,6 +157,84 @@ public class WavefrontProperties {
 
 	private boolean usesProxy() {
 		return "proxy".equals(this.uri.getScheme());
+	}
+
+	public Set<String> getTraceDerivedCustomTagKeys() {
+		return this.traceDerivedCustomTagKeys;
+	}
+
+	public void setTraceDerivedCustomTagKeys(Set<String> traceDerivedCustomTagKeys) {
+		this.traceDerivedCustomTagKeys = traceDerivedCustomTagKeys;
+	}
+
+	public static class Application {
+
+		/**
+		 * Wavefront 'Application' name used in ApplicationTags.
+		 */
+		private String name = "unnamed_application";
+
+		/**
+		 * Wavefront 'Service' name used in ApplicationTags, falling back to
+		 * 'spring.application.name'. If both are unset it defaults to 'unnamed_service'.
+		 */
+		private String serviceName;
+
+		/**
+		 * Wavefront Cluster name used in ApplicationTags.
+		 */
+		private String clusterName;
+
+		/**
+		 * Wavefront Shard name used in ApplicationTags.
+		 */
+		private String shardName;
+
+		/**
+		 * Wavefront custom tags used in ApplicationTags.
+		 */
+		private Map<String, String> customTags = new HashMap<>();
+
+		public String getServiceName() {
+			return this.serviceName;
+		}
+
+		public void setServiceName(String serviceName) {
+			this.serviceName = serviceName;
+		}
+
+		public String getName() {
+			return this.name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public String getClusterName() {
+			return this.clusterName;
+		}
+
+		public void setClusterName(String clusterName) {
+			this.clusterName = clusterName;
+		}
+
+		public String getShardName() {
+			return this.shardName;
+		}
+
+		public void setShardName(String shardName) {
+			this.shardName = shardName;
+		}
+
+		public Map<String, String> getCustomTags() {
+			return this.customTags;
+		}
+
+		public void setCustomTags(Map<String, String> customTags) {
+			this.customTags = customTags;
+		}
+
 	}
 
 	public static class Sender {
@@ -254,36 +342,6 @@ public class WavefrontProperties {
 				throw new UnsupportedOperationException("Use Sender.setBatchSize(int) instead");
 			}
 
-		}
-
-	}
-
-	public static class Tracing {
-
-		/**
-		 * Application name. Defaults to 'spring.application.name'.
-		 */
-		private String applicationName;
-
-		/**
-		 * Service name. Defaults to 'spring.application.name'.
-		 */
-		private String serviceName;
-
-		public String getServiceName() {
-			return this.serviceName;
-		}
-
-		public void setServiceName(String serviceName) {
-			this.serviceName = serviceName;
-		}
-
-		public String getApplicationName() {
-			return this.applicationName;
-		}
-
-		public void setApplicationName(String applicationName) {
-			this.applicationName = applicationName;
 		}
 
 	}

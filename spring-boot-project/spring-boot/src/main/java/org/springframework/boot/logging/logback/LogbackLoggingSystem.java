@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,12 +31,13 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.classic.jul.LevelChangePropagator;
 import ch.qos.logback.classic.turbo.TurboFilter;
-import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.spi.FilterReply;
 import ch.qos.logback.core.status.OnConsoleStatusListener;
 import ch.qos.logback.core.status.Status;
+import ch.qos.logback.core.status.StatusUtil;
 import ch.qos.logback.core.util.StatusListenerConfigHelper;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,7 +206,11 @@ public class LogbackLoggingSystem extends AbstractLoggingSystem implements BeanF
 		stopAndReset(loggerContext);
 		SpringBootJoranConfigurator configurator = new SpringBootJoranConfigurator(initializationContext);
 		configurator.setContext(loggerContext);
-		return configurator.configureUsingAotGeneratedArtifacts();
+		boolean configuredUsingAotGeneratedArtifacts = configurator.configureUsingAotGeneratedArtifacts();
+		if (configuredUsingAotGeneratedArtifacts) {
+			reportConfigurationErrorsIfNecessary(loggerContext);
+		}
+		return configuredUsingAotGeneratedArtifacts;
 	}
 
 	@Override
@@ -239,6 +244,10 @@ public class LogbackLoggingSystem extends AbstractLoggingSystem implements BeanF
 		catch (Exception ex) {
 			throw new IllegalStateException("Could not initialize Logback logging from " + location, ex);
 		}
+		reportConfigurationErrorsIfNecessary(loggerContext);
+	}
+
+	private void reportConfigurationErrorsIfNecessary(LoggerContext loggerContext) {
 		List<Status> statuses = loggerContext.getStatusManager().getCopyOfStatusList();
 		StringBuilder errors = new StringBuilder();
 		for (Status status : statuses) {
@@ -250,17 +259,20 @@ public class LogbackLoggingSystem extends AbstractLoggingSystem implements BeanF
 		if (errors.length() > 0) {
 			throw new IllegalStateException(String.format("Logback configuration error detected: %n%s", errors));
 		}
+		if (!StatusUtil.contextHasStatusListener(loggerContext)) {
+			StatusPrinter.printInCaseOfErrorsOrWarnings(loggerContext);
+		}
 	}
 
 	private void configureByResourceUrl(LoggingInitializationContext initializationContext, LoggerContext loggerContext,
 			URL url) throws JoranException {
-		if (url.toString().endsWith("xml")) {
+		if (url.toString().endsWith(".xml")) {
 			JoranConfigurator configurator = new SpringBootJoranConfigurator(initializationContext);
 			configurator.setContext(loggerContext);
 			configurator.doConfigure(url);
 		}
 		else {
-			new ContextInitializer(loggerContext).configureByResource(url);
+			throw new IllegalArgumentException("Unsupported file extension in '" + url + "'. Only .xml is supported");
 		}
 	}
 
@@ -408,7 +420,7 @@ public class LogbackLoggingSystem extends AbstractLoggingSystem implements BeanF
 		String key = BeanFactoryInitializationAotContribution.class.getName();
 		LoggerContext context = getLoggerContext();
 		BeanFactoryInitializationAotContribution contribution = (BeanFactoryInitializationAotContribution) context
-				.getObject(key);
+			.getObject(key);
 		context.removeObject(key);
 		return contribution;
 	}
